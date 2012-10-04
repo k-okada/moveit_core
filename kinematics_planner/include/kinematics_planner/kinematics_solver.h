@@ -42,6 +42,7 @@
 #include <boost/shared_ptr.hpp>
 
 // ROS msgs
+#include <kinematics_msgs/GetConstraintAwarePositionIK.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <moveit_msgs/MoveItErrorCodes.h>
 #include <moveit_msgs/Constraints.h>
@@ -74,92 +75,54 @@ class KinematicsSolver
 
   /** @brief Initialize
    * @param kinematic_model An instance of a kinematic model
-   * @param kinematics_solver_map A set of solvers for all the sub groups in the desired group
-   * @param group_name The group name to plan for
-   * @return False if group_name is invalid or kinematics solvers are not defined for all subgroups
+   * @return False if any error occurs
    */
-  bool initialize(const planning_models::KinematicModelConstPtr &kinematic_model,
-                  const std::map<std::string, kinematics::KinematicsBasePtr> &kinematics_solver_map,
-                  const std::string &group_name);
+  bool initialize(const planning_models::KinematicModelConstPtr &kinematic_model);
 
   /** @brief Solve the planning problem
-   * @param start_request A map from group names to desired poses
    * @param planning_scene A const reference to the planning scene
-   * @param kinematic_constraint_set A pre-allocated instance of KinematicConstraintSet (for efficiency)
-   * @param timeout The total amount of time to be spent in the solve step (in seconds)
-   * @param robot_trajectory The desired robot trajectory
-   * @param error_code An error code
-   * @return False if group_name is invalid or kinematics solvers are not defined for all subgroups
+   * @param request A const reference to the kinematics request
+   * @param response The solution (if it exists)
+   * @return False if group_name is invalid or ik fails
    */
-  bool solve(const std::map<std::string,geometry_msgs::PoseStamped> &poses,
-             const planning_scene::PlanningSceneConstPtr &planning_scene,
-             double timeout,
-             moveit_msgs::RobotState &solution,
-             moveit_msgs::MoveItErrorCodes &error_code,
-             const kinematic_constraints::KinematicConstraintSet& kinematic_constraint_set) const;
-
-  /** @brief Solve the planning problem
-   * @param start_request A map from group names to desired poses
-   * @param planning_scene A const reference to the planning scene
-   * @param kinematic_constraint_set A pre-allocated instance of KinematicConstraintSet (for efficiency)
-   * @param timeout The total amount of time to be spent in the solve step (in seconds)
-   * @param robot_trajectory The desired robot trajectory
-   * @param error_code An error code
-   * @return False if group_name is invalid or kinematics solvers are not defined for all subgroups
-   */
-  bool solve(const geometry_msgs::PoseStamped &pose,
-             const planning_scene::PlanningSceneConstPtr &planning_scene,
-             double timeout,
-             moveit_msgs::RobotState &solution,
-             moveit_msgs::MoveItErrorCodes &error_code,
-             const kinematic_constraints::KinematicConstraintSet& kinematic_constraint_set) const;
-  
-  std::map<std::string,kinematics::KinematicsBaseConstPtr> getKinematicsSolverMap()
-  {
-    std::map<std::string, kinematics::KinematicsBaseConstPtr> kinematics_solver_map;
-    for(unsigned int i=0; i < group_names_.size(); ++i)
-    {
-      kinematics_solver_map[group_names_[i]] = kinematics_solvers_[i];
-    }
-    return kinematics_solver_map;
-  }    
-
-  bool isValid(const planning_models::KinematicState &kinematic_state,
-               const planning_scene::PlanningSceneConstPtr& planning_scene,
-               moveit_msgs::MoveItErrorCodes &error_code) const;
-        
+  bool getIK(const planning_scene::PlanningSceneConstPtr &planning_scene,
+             const kinematics_msgs::GetConstraintAwarePositionIK::Request &request,
+             kinematics_msgs::GetConstraintAwarePositionIK::Response &response) const;
+    
 protected:
 
   std::vector<double> getFloatingJointValues(const geometry_msgs::Pose &pose) const;
   
   geometry_msgs::Pose getPose(const std::vector<double> &values) const;
   
-  
   std::map<std::string,geometry_msgs::PoseStamped> transformPoses(const planning_scene::PlanningSceneConstPtr& planning_scene, 
                                                                   const planning_models::KinematicState &kinematic_state,
                                                                   const std::map<std::string,geometry_msgs::PoseStamped> &poses,
-                                                                  const std::string &target_frame) const;
+                                                                  const std::map<std::string,std::string> &target_frames) const;
 
-  std::map<std::string,geometry_msgs::PoseStamped> transformPoses(const planning_scene::PlanningSceneConstPtr& planning_scene, 
-                                                                  const planning_models::KinematicState &kinematic_state,
-                                                                  const std::map<std::string,geometry_msgs::PoseStamped> &poses,
-                                                                  const std::vector<std::string> &target_frames) const;
+  bool getGoal(const planning_scene::PlanningSceneConstPtr &planning_scene,
+               const planning_models::KinematicState &kinematic_state,
+               const kinematics_msgs::GetConstraintAwarePositionIK::Request &request,
+               std::map<std::string,geometry_msgs::PoseStamped>& pose_stamped) const;
 
-  moveit_msgs::RobotState getRobotState(const kinematics_planner::SolutionStateMap &solutions) const;  
+  geometry_msgs::Pose getTipFramePose(const planning_scene::PlanningSceneConstPtr& planning_scene, 
+                                      const planning_models::KinematicState &kinematic_state,
+                                      const geometry_msgs::Pose &pose,
+                                      const std::string &link_name,
+                                      const std::string &group_name) const;
   
-  bool checkRequest(const std::map<std::string,geometry_msgs::PoseStamped> &start) const;
-
-  //  const kinematics_planner::KinematicsSolverMap kinematics_solver_map_;
-  std::vector<kinematics::KinematicsBaseConstPtr> kinematics_solvers_;
-
-  std::vector<std::string> kinematics_base_frames_;
-    
-  std::string group_name_;
-
-  std::vector<std::string> group_names_, joint_names_;
-
-  unsigned int num_groups_;
+  moveit_msgs::RobotState getRobotState(const kinematics_planner::SolutionStateMap &solutions,
+                                        const std::vector<std::string> &group_names) const;  
   
+  std::vector<kinematics::KinematicsBaseConstPtr> getKinematicsSolvers(const std::vector<std::string> &group_names) const;
+  
+  std::map<std::string,kinematics::KinematicsBaseConstPtr> kinematics_solver_map_;    
+
+  std::map<std::string, std::vector<std::string> > group_map_;
+
+  planning_models::KinematicModelConstPtr kinematic_model_;
+  
+
 };
 
 typedef boost::shared_ptr<KinematicsSolver> KinematicsSolverPtr;
