@@ -53,14 +53,14 @@ bool KinematicsSolver::initialize(const planning_models::KinematicModelConstPtr 
     if(iter->second->getSolverInstance())
     {
       std::vector<std::string> sub_groups;
-      sub_groups.push_back(iter->first);      
+      sub_groups.push_back(iter->first);
       kinematics_solver_map_.insert(std::pair<std::string,kinematics::KinematicsBaseConstPtr> (iter->first,iter->second->getSolverInstance()));
       group_map_.insert(std::pair<std::string,std::vector<std::string> > (iter->first,sub_groups));
     }   
     else
     {
       ROS_DEBUG("No kinematics solver instance defined for group %s",iter->first.c_str());
-      bool is_solvable_group = true;      
+      bool is_solvable_group = true;
       if(!iter->second->getSubgroupNames().empty())
       {
         const std::vector<std::string> sub_group_names = iter->second->getSubgroupNames();
@@ -68,32 +68,32 @@ bool KinematicsSolver::initialize(const planning_models::KinematicModelConstPtr 
         {
           if(!kinematic_model->getJointModelGroup(sub_group_names[i])->getSolverInstance())
           {
-            is_solvable_group = false;            
-            break;            
-          }                   
-        }  
+            is_solvable_group = false;
+            break;
+          }
+        }
         if(is_solvable_group)
         {
-          ROS_DEBUG("Group %s is still a group for which we can solve IK",iter->first.c_str());          
+          ROS_DEBUG("Group %s is still a group for which we can solve IK",iter->first.c_str());
           group_map_.insert(std::pair<std::string,std::vector<std::string> >(iter->first,sub_group_names));
-        }        
-      }      
-    }    
+        }
+      }
+    }
   }
-  return true;  
+  return true;
 }
 
 bool KinematicsSolver::getIK(const planning_scene::PlanningSceneConstPtr &planning_scene,
                              const kinematics_msgs::GetConstraintAwarePositionIK::Request &request,
                              kinematics_msgs::GetConstraintAwarePositionIK::Response &response) const
 {
-  ros::WallTime start_time = ros::WallTime::now();  
+  ros::WallTime start_time = ros::WallTime::now();
   if(group_map_.find(request.ik_request.group_name) == group_map_.end())
   {
-    ROS_ERROR("Could not find group %s",request.ik_request.group_name.c_str());    
+    ROS_ERROR("Could not find group %s",request.ik_request.group_name.c_str());
     response.error_code.val = response.error_code.INVALID_GROUP_NAME;
     return false;
-  }  
+  }
 
   // Setup the seed and the values for all other joints in the robot
   planning_models::KinematicState kinematic_state = planning_scene->getCurrentState();
@@ -105,22 +105,22 @@ bool KinematicsSolver::getIK(const planning_scene::PlanningSceneConstPtr &planni
   std::map<std::string,std::string> kinematics_base_frames;
   for(unsigned int i=0; i < kinematics_solvers.size(); ++i)
   {
-    kinematics_base_frames.insert(std::pair<std::string,std::string> (group_names[i],kinematics_solvers[i]->getBaseFrame()));    
-  }  
+    kinematics_base_frames.insert(std::pair<std::string,std::string> (group_names[i],kinematics_solvers[i]->getBaseFrame()));
+  }
 
   // Get goals (for multi-group as well)
   std::map<std::string,geometry_msgs::PoseStamped> goals;
   if(!getGoal(planning_scene,kinematic_state,request,goals))
   {
     ROS_ERROR("Request is invalid");
-    response.error_code.val = response.error_code.GOAL_IN_COLLISION;    
+    response.error_code.val = response.error_code.GOAL_IN_COLLISION;
     return false;
-  }  
-  
+  }
+
   // Get a joint state group for each sub-group that we are dealing with
   std::vector<planning_models::KinematicState::JointStateGroup*> joint_state_groups(group_names.size());
   for(unsigned int i=0; i < group_names.size(); ++i)
-    joint_state_groups[i] = kinematic_state.getJointStateGroup(group_names[i]);    
+    joint_state_groups[i] = kinematic_state.getJointStateGroup(group_names[i]);
 
   // Create a collision request
   collision_detection::CollisionRequest collision_request;
