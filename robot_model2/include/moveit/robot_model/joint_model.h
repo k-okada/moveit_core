@@ -40,10 +40,8 @@
 #include <map>
 #include <string>
 #include <vector>
-#include <utility>
 #include <moveit_msgs/JointLimits.h>
 #include <random_numbers/random_numbers.h>
-#include <console_bridge/console.h>
 #include <Eigen/Geometry>
 
 namespace moveit
@@ -95,7 +93,6 @@ class LinkModel;
     variables directly. */
 class JointModel
 {
-  friend class RobotModel;
 public:
 
   /** \brief The different types of joints we support */
@@ -158,18 +155,12 @@ public:
   {
     return variable_names_;
   }
+
   /** \brief Get the local names of the variable that make up the joint (suffixes that are attached to joint names to construct the variable names).
       For single DOF joints, this will be empty. */
   const std::vector<std::string>& getLocalVariableNames() const
   {
     return local_variable_names_;
-  }
-
-  /** \brief The set of variables that make up the state value of a joint are stored in some order. This map
-      gives the position of each variable in that order, for each variable name */
-  const std::vector<std::size_t>& getVariableIndex() const
-  {
-    return variable_index_;
   }
 
   /** \brief Check if a particular variable is known to this joint */
@@ -189,83 +180,61 @@ public:
   /** @name Functionality specific to computing state values
       @{ */
 
-  /** \brief Provide defaults value for the joint variables, given the default joint variable bounds (maintained internally).
-      Most joints will use the default implementation provided in this base class, but the quaternion
-      for example needs a different implementation. The map is NOT cleared; elements are only added (or overwritten). */
-  void getVariableDefaultValues(std::map<std::string, double> &values) const
-  {
-    getVariableDefaultValues(values, variable_bounds_);
-  }
-
-  /** \brief Provide a default value for the joint variables given the joint bounds.
-      Most joints will use the default implementation provided in this base class, but the quaternion
-      for example needs a different implementation. The map is NOT cleared; elements are only added (or overwritten). */
-  void getVariableDefaultValues(std::map<std::string, double> &values, const Bounds &other_bounds) const;
-
   /** \brief Provide a default value for the joint given the default joint variable bounds (maintained internally).
       Most joints will use the default implementation provided in this base class, but the quaternion
-      for example needs a different implementation. The vector is NOT cleared; elements are only added with push_back */
-  void getVariableDefaultValues(std::vector<double> &values) const
+      for example needs a different implementation. Enough memory is assumed to be allocated. */
+  void getVariableDefaultValues(double *values) const
   {
     getVariableDefaultValues(values, variable_bounds_);
   }
 
   /** \brief Provide a default value for the joint given the joint variable bounds.
       Most joints will use the default implementation provided in this base class, but the quaternion
-      for example needs a different implementation. The vector is NOT cleared; elements are only added with push_back */
-  virtual void getVariableDefaultValues(std::vector<double> &values, const Bounds &other_bounds) const = 0;
+      for example needs a different implementation. Enough memory is assumed to be allocated. */
+  virtual void getVariableDefaultValues(double *values, const Bounds &other_bounds) const = 0;
 
-  /** \brief Provide random values for the joint variables (within default bounds). The map is NOT cleared; elements are only added (or overwritten). */
-  void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::map<std::string, double> &values) const
+  /** \brief Provide random values for the joint variables (within default bounds). Enough memory is assumed to be allocated. */
+  void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, double *values) const
   {
     getVariableRandomValues(rng, values, variable_bounds_);
   }
 
-  /** \brief Provide random values for the joint variables (within specified bounds). The map is NOT cleared; elements are only added (or overwritten). */
-  void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::map<std::string, double> &values, const Bounds &other_bounds) const;
-
-  /** \brief Provide random values for the joint variables (within default bounds). The vector is NOT cleared; elements are only added with push_back */
-  void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values) const
-  {
-    getVariableRandomValues(rng, values, variable_bounds_);
-  }
-
-  /** \brief Provide random values for the joint variables (within specified bounds). The vector is NOT cleared; elements are only added with push_back */
-  virtual void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const Bounds &other_bounds) const = 0;
-
-  /** \brief Provide random values for the joint variables (within default bounds). The vector is NOT cleared; elements are only added with push_back */
-  void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values,
-                                     const std::vector<double> &near, const double distance) const
+  /** \brief Provide random values for the joint variables (within specified bounds). Enough memory is assumed to be allocated. */
+  virtual void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, double *values, const Bounds &other_bounds) const = 0;
+  
+  /** \brief Provide random values for the joint variables (within default bounds). Enough memory is assumed to be allocated. */
+  void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values,
+                                     const double *near, const double distance) const
   {
     getVariableRandomValuesNearBy(rng, values, variable_bounds_, near, distance);
   }
 
-  /** \brief Provide random values for the joint variables (within specified bounds). The vector is NOT cleared; elements are only added with push_back */
-  virtual void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const Bounds &other_bounds,
-                                             const std::vector<double> &near, const double distance) const = 0;
-
+  /** \brief Provide random values for the joint variables (within specified bounds). Enough memory is assumed to be allocated. */
+  virtual void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const Bounds &other_bounds,
+                                             const double *near, const double distance) const = 0;
+  
   /** @} */
 
   /** @name Functionality specific to verifying bounds
       @{ */
 
   /** \brief Check if the set of values for the variables of this joint are within bounds. */
-  bool satisfiesBounds(const std::vector<double> &values, double margin = 0.0) const
+  bool satisfiesBounds(const double *values, double margin = 0.0) const
   {
     return satisfiesBounds(values, variable_bounds_, margin);
   }
 
   /** \brief Check if the set of values for the variables of this joint are within bounds, up to some margin. */
-  virtual bool satisfiesBounds(const std::vector<double> &values, const Bounds &other_bounds, double margin) const = 0;
+  virtual bool satisfiesBounds(const double *values, const Bounds &other_bounds, double margin) const = 0;
 
   /** \brief Force the specified values to be inside bounds and normalized. Quaternions are normalized, continuous joints are made between -Pi and Pi. */
-  void enforceBounds(std::vector<double> &values) const
+  void enforceBounds(double *values) const
   {
     enforceBounds(values, variable_bounds_);
   }
 
   /** \brief Force the specified values to be inside bounds and normalized. Quaternions are normalized, continuous joints are made between -Pi and Pi. */
-  virtual void enforceBounds(std::vector<double> &values, const Bounds &other_bounds) const = 0;
+  virtual void enforceBounds(double *values, const Bounds &other_bounds) const = 0;
 
   /** \brief Get the bounds for a variable. Throw an exception if the variable was not found */
   const VariableBounds& getVariableBounds(const std::string& variable) const;
@@ -276,18 +245,18 @@ public:
     return variable_bounds_;
   }
 
-  /** \brief Set the lower and upper bounds for a variable. Throw an exception if the variable was not found */
+  /** \brief Set the lower and upper bounds for a variable. Throw an exception if the variable was not found. */
   void setVariableBounds(const std::string& variable, const VariableBounds& bounds);
 
-  /** \brief Override joint limits */
-  void setVariableLimits(const std::vector<moveit_msgs::JointLimits>& jlim);
+  /** \brief Override joint limits loaded from URDF. Unknown variables are ignored. */
+  void setVariableBounds(const std::vector<moveit_msgs::JointLimits>& jlim);
 
-  /** \brief Get the joint limits specified by the user with setLimits() or the default joint limits using getVariableLimits(), if no joint limits were specified. */
-  const std::vector<moveit_msgs::JointLimits>& getVariableLimits() const
+  /** \brief Get the joint limits known to this model, as a message. */
+  const std::vector<moveit_msgs::JointLimits>& getVariableBoundsMsg() const
   {
-    return variable_limits_;
+    return variable_bounds_msg_;
   }
-
+  
   /** @} */
 
   /** \brief Compute the distance between two joint states of the same model (represented by the variable values) */
@@ -359,13 +328,13 @@ public:
 
   /** \brief Given the transform generated by joint, compute the corresponding joint values */
   virtual void computeVariableValues(const Eigen::Affine3d& transform, double *joint_values) const = 0;
-
+  
   /** @} */
-
+  
 protected:
 
-  virtual void computeDefaultVariableLimits();
-
+  void computeVariableBoundsMsg();
+  
   /** \brief Name of the joint */
   std::string                                       name_;
 
@@ -381,9 +350,9 @@ protected:
   /** \brief The bounds for each variable (low, high) in the same order as variable_names_ */
   Bounds                                            variable_bounds_;
 
-  std::vector<moveit_msgs::JointLimits>             variable_limits_;
+  std::vector<moveit_msgs::JointLimits>             variable_bounds_msg_;
   
-  /** \brief Map from variable names to the corresponding index in variable_names_ */
+  /** \brief Map from variable names to the corresponding index in variable_names_ (indexing makes sense within the JointModel only) */
   std::map<std::string, std::size_t>                variable_index_map_;
 
   std::vector<std::size_t>                          variable_index_;

@@ -39,7 +39,9 @@
 #include <limits>
 #include <cmath>
 
-robot_model::PlanarJointModel::PlanarJointModel(const std::string& name) : JointModel(name), angular_distance_weight_(1.0)
+moveit::core::PlanarJointModel::PlanarJointModel(const std::string& name)
+  : JointModel(name)
+  , angular_distance_weight_(1.0)
 {
   type_ = PLANAR;
 
@@ -47,76 +49,85 @@ robot_model::PlanarJointModel::PlanarJointModel(const std::string& name) : Joint
   local_variable_names_.push_back("y");
   local_variable_names_.push_back("theta");
   for (int i = 0 ; i < 3 ; ++i)
+  {
     variable_names_.push_back(name_ + "/" + local_variable_names_[i]);
+    variable_index_map_[variable_names_.back()] = i;
+  }
+  
   variable_bounds_.resize(3);
-  variable_bounds_[0] = std::make_pair(-std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
-  variable_bounds_[1] = std::make_pair(-std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
-  variable_bounds_[2] = std::make_pair(-boost::math::constants::pi<double>(), boost::math::constants::pi<double>());
+  variable_bounds_[0].position_bounded_ = true;
+  variable_bounds_[1].position_bounded_ = true;
+  variable_bounds_[2].position_bounded_ = false;
+
+  variable_bounds_[0].min_position_ = -std::numeric_limits<double>::max();
+  variable_bounds_[0].max_position_ = std::numeric_limits<double>::max();
+  variable_bounds_[1].min_position_ = -std::numeric_limits<double>::max();
+  variable_bounds_[1].max_position_ = std::numeric_limits<double>::max();
+  variable_bounds_[2].min_position_ = -boost::math::constants::pi<double>();
+  variable_bounds_[2].max_position_ = boost::math::constants::pi<double>();
+  
+  variable_index_.resize(3, 0);
+  computeVariableBoundsMsg();  
 }
 
-unsigned int robot_model::PlanarJointModel::getStateSpaceDimension() const
+unsigned int moveit::core::PlanarJointModel::getStateSpaceDimension() const
 {
   return 3;
 }
 
-double robot_model::PlanarJointModel::getMaximumExtent(const Bounds &other_bounds) const
+double moveit::core::PlanarJointModel::getMaximumExtent(const Bounds &other_bounds) const
 {
-  double dx = other_bounds[0].first - other_bounds[0].second;
-  double dy = other_bounds[1].first - other_bounds[1].second;
+  double dx = other_bounds[0].max_position_ - other_bounds[0].min_position_;
+  double dy = other_bounds[1].max_position_ - other_bounds[1].min_position_;
   return sqrt(dx*dx + dy*dy) + boost::math::constants::pi<double>() * angular_distance_weight_;
 }
 
-void robot_model::PlanarJointModel::getVariableDefaultValues(std::vector<double>& values, const Bounds &bounds) const
+void moveit::core::PlanarJointModel::getVariableDefaultValues(double *values, const Bounds &bounds) const
 {
-  assert(bounds.size() > 1);
   for (unsigned int i = 0 ; i < 2 ; ++i)
   {
     // if zero is a valid value
-    if (bounds[i].first <= 0.0 && bounds[i].second >= 0.0)
-      values.push_back(0.0);
+    if (bounds[i].min_position_ <= 0.0 && bounds[i].max_position_ >= 0.0)
+      values[i] = 0.0;
     else
-      values.push_back((bounds[i].first + bounds[i].second)/2.0);
+      values[i] = (bounds[i].min_position_ + bounds[i].max_position_) / 2.0;
   }
-  values.push_back(0.0);
+  values[2] = 0.0;
 }
 
-void robot_model::PlanarJointModel::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const Bounds &bounds) const
+void moveit::core::PlanarJointModel::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, double *values, const Bounds &bounds) const
 {
-  std::size_t s = values.size();
-  values.resize(s + 3);
-  if (bounds[0].second >= std::numeric_limits<double>::max() || bounds[0].first <= -std::numeric_limits<double>::max())
-    values[s] = 0.0;
+  if (bounds[0].max_position_ >= std::numeric_limits<double>::max() || bounds[0].min_position_ <= -std::numeric_limits<double>::max())
+    values[0] = 0.0;
   else
-    values[s] = rng.uniformReal(bounds[0].first, bounds[0].second);
-  if (bounds[1].second >= std::numeric_limits<double>::max() || bounds[1].first <= -std::numeric_limits<double>::max())
-    values[s + 1] = 0.0;
+    values[0] = rng.uniformReal(bounds[0].min_position_, bounds[0].max_position_);
+  if (bounds[1].max_position_ >= std::numeric_limits<double>::max() || bounds[1].min_position_ <= -std::numeric_limits<double>::max())
+    values[1] = 0.0;
   else
-    values[s + 1] = rng.uniformReal(bounds[1].first, bounds[1].second);
-  values[s + 2] = rng.uniformReal(bounds[2].first, bounds[2].second);
+    values[1] = rng.uniformReal(bounds[1].min_position_, bounds[1].max_position_);
+  values[2] = rng.uniformReal(bounds[2].min_position_, bounds[2].max_position_);
 }
 
-void robot_model::PlanarJointModel::getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const Bounds &bounds,
-                                                                      const std::vector<double> &near, const double distance) const
+void moveit::core::PlanarJointModel::getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const Bounds &bounds,
+                                                                   const double *near, const double distance) const
 {
-  std::size_t s = values.size();
-  values.resize(s + 3);
-  if (bounds[0].second >= std::numeric_limits<double>::max() || bounds[0].first <= -std::numeric_limits<double>::max())
-    values[s] = 0.0;
+  if (bounds[0].max_position_ >= std::numeric_limits<double>::max() || bounds[0].min_position_ <= -std::numeric_limits<double>::max())
+    values[0] = 0.0;
   else
-    values[s] = rng.uniformReal(std::max(bounds[0].first, near[s] - distance),
-                                std::min(bounds[0].second, near[s] + distance));
-  if (bounds[1].second >= std::numeric_limits<double>::max() || bounds[1].first <= -std::numeric_limits<double>::max())
-    values[s + 1] = 0.0;
+    values[0] = rng.uniformReal(std::max(bounds[0].min_position_, near[0] - distance),
+                                std::min(bounds[0].max_position_, near[0] + distance));
+  if (bounds[1].max_position_ >= std::numeric_limits<double>::max() || bounds[1].min_position_ <= -std::numeric_limits<double>::max())
+    values[1] = 0.0;
   else
-    values[s + 1] = rng.uniformReal(std::max(bounds[1].first, near[s + 1] - distance),
-                                    std::min(bounds[1].second, near[s + 1] + distance));
+    values[1] = rng.uniformReal(std::max(bounds[1].min_position_, near[1] - distance),
+                                std::min(bounds[1].max_position_, near[1] + distance));
 
   double da = angular_distance_weight_ * distance;
-  values[s + 2] = rng.uniformReal(near[s + 2] - da, near[s + 2] + da);
+  values[2] = rng.uniformReal(near[2] - da, near[2] + da);
   normalizeRotation(values);
 }
 
-void robot_model::PlanarJointModel::interpolate(const std::vector<double> &from, const std::vector<double> &to, const double t, std::vector<double> &state) const
+void moveit::core::PlanarJointModel::interpolate(const double *from, const double *to, const double t, double *state) const
 {
   // interpolate position
   state[0] = from[0] + (to[0] - from[0]) * t;
@@ -142,10 +153,8 @@ void robot_model::PlanarJointModel::interpolate(const std::vector<double> &from,
   }
 }
 
-double robot_model::PlanarJointModel::distance(const std::vector<double> &values1, const std::vector<double> &values2) const
+double moveit::core::PlanarJointModel::distance(const double *values1, const double *values2) const
 {
-  assert(values1.size() == 3);
-  assert(values2.size() == 3);
   double dx = values1[0] - values2[0];
   double dy = values1[1] - values2[1];
 
@@ -154,16 +163,15 @@ double robot_model::PlanarJointModel::distance(const std::vector<double> &values
   return sqrt(dx*dx + dy*dy) + angular_distance_weight_ * d;
 }
 
-bool robot_model::PlanarJointModel::satisfiesBounds(const std::vector<double> &values, const Bounds &bounds, double margin) const
+bool moveit::core::PlanarJointModel::satisfiesBounds(const double *values, const Bounds &bounds, double margin) const
 {
-  assert(bounds.size() > 1);
   for (unsigned int i = 0 ; i < 3 ; ++i)
-  if (values[0] < bounds[0].first - margin || values[0] > bounds[0].second + margin)
-    return false;
+    if (values[0] < bounds[0].min_position_ - margin || values[0] > bounds[0].max_position_ + margin)
+      return false;
   return true;
 }
 
-bool robot_model::PlanarJointModel::normalizeRotation(std::vector<double> &values) const
+bool moveit::core::PlanarJointModel::normalizeRotation(double *values) const
 {
   double &v = values[2];
   if (v >= -boost::math::constants::pi<double>() && v <= boost::math::constants::pi<double>())
@@ -177,36 +185,29 @@ bool robot_model::PlanarJointModel::normalizeRotation(std::vector<double> &value
   return true;
 }
 
-void robot_model::PlanarJointModel::enforceBounds(std::vector<double> &values, const Bounds &bounds) const
+void moveit::core::PlanarJointModel::enforceBounds(double *values, const Bounds &bounds) const
 {
   normalizeRotation(values);
   for (unsigned int i = 0 ; i < 2 ; ++i)
   {
-    const std::pair<double, double> &b = bounds[i];
-    if (values[i] < b.first)
-      values[i] = b.first;
+    if (values[i] < bounds[i].min_position_)
+      values[i] = bounds[i].min_position_;
     else
-      if (values[i] > b.second)
-        values[i] = b.second;
+      if (values[i] > bounds[i].max_position_)
+        values[i] = bounds[i].max_position_;
   }
 }
 
-void robot_model::PlanarJointModel::computeTransform(const std::vector<double>& joint_values, Eigen::Affine3d &transf) const
-{
-  updateTransform(joint_values, transf);
-}
-
-void robot_model::PlanarJointModel::updateTransform(const std::vector<double>& joint_values, Eigen::Affine3d &transf) const
+void moveit::core::PlanarJointModel::computeTransform(const double *joint_values, Eigen::Affine3d &transf) const
 {
   transf = Eigen::Affine3d(Eigen::Translation3d(joint_values[0], joint_values[1], 0.0) * Eigen::AngleAxisd(joint_values[2], Eigen::Vector3d::UnitZ()));
 }
 
-void robot_model::PlanarJointModel::computeJointStateValues(const Eigen::Affine3d& transf, std::vector<double> &joint_values) const
+void moveit::core::PlanarJointModel::computeJointStateValues(const Eigen::Affine3d& transf, double *joint_values) const
 {
-  joint_values.resize(3);
   joint_values[0] = transf.translation().x();
   joint_values[1] = transf.translation().y();
-
+  
   Eigen::Quaterniond q(transf.rotation());
   //taken from Bullet
   double s_squared = 1.0-(q.w()*q.w());
@@ -217,11 +218,4 @@ void robot_model::PlanarJointModel::computeJointStateValues(const Eigen::Affine3
     double s = 1.0/sqrt(s_squared);
     joint_values[2] = (acos(q.w())*2.0f)*(q.z()*s);
   }
-}
-
-std::vector<moveit_msgs::JointLimits> robot_model::PlanarJointModel::getVariableLimits() const
-{
-  std::vector<moveit_msgs::JointLimits> ret_vec = JointModel::getVariableLimits();
-  ret_vec[2].has_position_limits = false;
-  return ret_vec;
 }

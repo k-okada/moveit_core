@@ -34,39 +34,40 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_ROBOT_MODEL_REVOLUTE_JOINT_MODEL_
-#define MOVEIT_ROBOT_MODEL_REVOLUTE_JOINT_MODEL_
+#ifndef MOVEIT_CORE_ROBOT_MODEL_REVOLUTE_JOINT_MODEL_
+#define MOVEIT_CORE_ROBOT_MODEL_REVOLUTE_JOINT_MODEL_
 
 #include <moveit/robot_model/joint_model.h>
 
-namespace robot_model
+namespace moveit
+{
+namespace core
 {
 
 /** \brief A revolute joint */
 class RevoluteJointModel : public JointModel
 {
-  friend class RobotModel;
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   RevoluteJointModel(const std::string& name);
-  virtual void getVariableDefaultValues(std::vector<double> &values, const Bounds &other_bounds) const;
-  virtual void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const Bounds &other_bounds) const;
-  virtual void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const Bounds &other_bounds,
-                                             const std::vector<double> &near, const double distance) const;
-  virtual void enforceBounds(std::vector<double> &values, const Bounds &other_bounds) const;
-  virtual bool satisfiesBounds(const std::vector<double> &values, const Bounds &other_bounds, double margin) const;
+  virtual void getVariableDefaultValues(double *values, const Bounds &other_bounds) const;
+  virtual void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, double *values, const Bounds &other_bounds) const;
+  virtual void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const Bounds &other_bounds,
+                                             const double *near, const double distance) const;
+  virtual void enforceBounds(double *values, const Bounds &other_bounds) const;
+  virtual bool satisfiesBounds(const double *values, const Bounds &other_bounds, double margin) const;
 
-  virtual void interpolate(const std::vector<double> &from, const std::vector<double> &to, const double t, std::vector<double> &state) const;
+  virtual void interpolate(const double *from, const double *to, const double t, double *state) const;
   virtual unsigned int getStateSpaceDimension() const;
   virtual double getMaximumExtent(const Bounds &other_bounds) const;
-  virtual double distance(const std::vector<double> &values1, const std::vector<double> &values2) const;
-  virtual void computeDefaultVariableLimits();
+  virtual double distance(const double *values1, const double *values2) const;
 
-  virtual void computeTransform(const std::vector<double>& joint_values, Eigen::Affine3d &transf) const;
-  virtual void computeJointStateValues(const Eigen::Affine3d& transf, std::vector<double> &joint_values) const;
-  virtual void updateTransform(const std::vector<double>& joint_values, Eigen::Affine3d &transf) const;
+  virtual void computeTransform(const double *joint_values, Eigen::Affine3d &transf) const;
+  virtual void computeJointStateValues(const Eigen::Affine3d& transf, double *joint_values) const;
 
+  void setContinuous(bool flag);
+  
   /** \brief Check if this joint wraps around */
   bool isContinuous() const
   {
@@ -79,6 +80,12 @@ public:
     return axis_;
   }
 
+  /** \brief Set the axis of rotation */
+  void setAxis(const Eigen::Vector3d &axis)
+  {
+    axis_ = axis;
+  }
+
 protected:
   /** \brief The axis of the joint */
   Eigen::Vector3d axis_;
@@ -87,6 +94,7 @@ protected:
   bool continuous_;
 };
 
+}
 }
 
 #endif

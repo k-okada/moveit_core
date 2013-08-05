@@ -36,62 +36,57 @@
 
 #include <moveit/robot_model/fixed_joint_model.h>
 
-robot_model::FixedJointModel::FixedJointModel(const std::string& name) : JointModel(name)
+moveit::core::FixedJointModel::FixedJointModel(const std::string& name) : JointModel(name)
 {
   type_ = FIXED;
 }
 
-unsigned int robot_model::FixedJointModel::getStateSpaceDimension() const
+unsigned int moveit::core::FixedJointModel::getStateSpaceDimension() const
 {
   return 0;
 }
 
-void robot_model::FixedJointModel::getVariableDefaultValues(std::vector<double>& values, const Bounds &bounds) const
+void moveit::core::FixedJointModel::getVariableDefaultValues(double *values, const Bounds &bounds) const
 {
 }
 
-void robot_model::FixedJointModel::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const Bounds &bounds) const
+void moveit::core::FixedJointModel::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, double *values, const Bounds &bounds) const
 {
 }
 
-void robot_model::FixedJointModel::getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const Bounds &bounds,
-                                                                     const std::vector<double> &near, const double distance) const
+void moveit::core::FixedJointModel::getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const Bounds &bounds,
+                                                                  const double *near, const double distance) const
 {
 }
 
-void robot_model::FixedJointModel::enforceBounds(std::vector<double> &values, const Bounds &bounds) const
+void moveit::core::FixedJointModel::enforceBounds(double *values, const Bounds &bounds) const
 {
 }
 
-bool robot_model::FixedJointModel::satisfiesBounds(const std::vector<double> &values, const Bounds &bounds, double margin) const
+bool moveit::core::FixedJointModel::satisfiesBounds(const double *values, const Bounds &bounds, double margin) const
 {
   return true;
 }
 
-double robot_model::FixedJointModel::distance(const std::vector<double> &values1, const std::vector<double> &values2) const
+double moveit::core::FixedJointModel::distance(const double *values1, const double *values2) const
 {
   return 0.0;
 }
 
-double robot_model::FixedJointModel::getMaximumExtent(const Bounds &other_bounds) const
+double moveit::core::FixedJointModel::getMaximumExtent(const Bounds &other_bounds) const
 {
   return 0.0;
 }
 
-void robot_model::FixedJointModel::interpolate(const std::vector<double> &from, const std::vector<double> &to, const double t, std::vector<double> &state) const
+void moveit::core::FixedJointModel::interpolate(const double *from, const double *to, const double t, double *state) const
 {
 }
 
-void robot_model::FixedJointModel::computeTransform(const std::vector<double>& /* joint_values */, Eigen::Affine3d &transf) const
+void moveit::core::FixedJointModel::computeTransform(const double */* joint_values */, Eigen::Affine3d &transf) const
 {
   transf.setIdentity();
 }
 
-void robot_model::FixedJointModel::updateTransform(const std::vector<double>& /* joint_values */, Eigen::Affine3d &transf) const
+void moveit::core::FixedJointModel::computeJointStateValues(const Eigen::Affine3d& /* transform */, double * /* joint_values */) const
 {
-}
-
-void robot_model::FixedJointModel::computeJointStateValues(const Eigen::Affine3d& /* transform */, std::vector<double>& joint_values) const
-{
-  joint_values.clear();
 }

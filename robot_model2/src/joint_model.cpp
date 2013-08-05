@@ -32,14 +32,24 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 *********************************************************************/
 
-/* Author: Ioan Sucan, E. Gil Jones */
+/* Author: Ioan Sucan */
 
+#include <moveit/exceptions/exceptions.h>
 #include <moveit/robot_model/joint_model.h>
 #include <moveit/robot_model/link_model.h>
+#include <algorithm>
 
-moveit::core::JointModel::JointModel(const std::string& name) :
-  name_(name), type_(UNKNOWN), max_velocity_(0.0), parent_link_model_(NULL), child_link_model_(NULL),
-  mimic_(NULL), mimic_factor_(1.0), mimic_offset_(0.0), passive_(false), distance_factor_(1.0), tree_index_(-1)
+moveit::core::JointModel::JointModel(const std::string& name)
+  : name_(name)
+  , type_(UNKNOWN)
+  , parent_link_model_(NULL)
+  , child_link_model_(NULL)
+  , mimic_(NULL)
+  , mimic_factor_(1.0)
+  , mimic_offset_(0.0)
+  , passive_(false)
+  , distance_factor_(1.0)
+  , tree_index_(-1)
 {
 }
 
@@ -61,82 +71,57 @@ std::string moveit::core::JointModel::getTypeName() const
   }
 }
 
-bool moveit::core::JointModel::getVariableBounds(const std::string& variable, std::pair<double, double>& bounds) const
+const moveit::core::VariableBounds& moveit::core::JointModel::getVariableBounds(const std::string& variable) const
 {
-  std::map<std::string, unsigned int>::const_iterator it = variable_index_.find(variable);
-  if (it == variable_index_.end())
-  {
-    logWarn("Could not find variable '%s' to get bounds for within joint '%s'", variable.c_str(), name_.c_str());
-    return false;
-  }
-  bounds = variable_bounds_[it->second];
-  return true;
+  std::map<std::string, std::size_t>::const_iterator it = variable_index_map_.find(variable);
+  if (it == variable_index_map_.end())
+    throw Exception("Could not find variable '" + variable + "' to get bounds for within joint '" + name_ + "'");
+  return variable_bounds_[it->second];
 }
 
-bool moveit::core::JointModel::setVariableBounds(const std::string& variable, const std::pair<double, double>& bounds)
+void moveit::core::JointModel::setVariableBounds(const std::string& variable, const VariableBounds& bounds)
 {
-  std::map<std::string, unsigned int>::const_iterator it = variable_index_.find(variable);
-  if (it == variable_index_.end())
-  {
-    logWarn("Could not find variable '%s' to set bounds for within joint '%s'", variable.c_str(), name_.c_str());
-    return false;
-  }
+  std::map<std::string, std::size_t>::const_iterator it = variable_index_map_.find(variable);
+  if (it == variable_index_map_.end())
+    throw Exception("Could not find variable '" + variable + "' to get bounds for within joint '" + name_ + "'");
   variable_bounds_[it->second] = bounds;
-  return true;
+  computeVariableBoundsMsg();
 }
 
-void moveit::core::JointModel::getVariableDefaultValues(std::map<std::string, double> &values, const Bounds &bounds) const
+void moveit::core::JointModel::setVariableBounds(const std::vector<moveit_msgs::JointLimits>& jlim)
 {
-  std::vector<double> defv;
-  defv.reserve(variable_names_.size());
-  getVariableDefaultValues(defv, bounds);
-  for (std::size_t i = 0 ; i < variable_names_.size() ; ++i)
-    values[variable_names_[i]] = defv[i];
-}
-
-void moveit::core::JointModel::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::map<std::string, double> &values, const Bounds &bounds) const
-{
-  std::vector<double> rv;
-  rv.reserve(variable_names_.size());
-  getVariableRandomValues(rng, rv, bounds);
-  for (std::size_t i = 0 ; i < variable_names_.size() ; ++i)
-    values[variable_names_[i]] = rv[i];
-}
-
-void moveit::core::JointModel::computeDefaultVariableLimits()
-{
-  default_limits_.clear();
-  for (std::size_t i = 0; i < variable_names_.size(); ++i)
-  {
-    moveit_msgs::JointLimits lim;
-    lim.joint_name = variable_names_[i];
-    lim.has_position_limits = true;
-    lim.min_position = variable_bounds_[i].first;
-    lim.max_position = variable_bounds_[i].second;
-    if (max_velocity_ != 0.0)
-      lim.has_velocity_limits = true;
-    else
-      lim.has_velocity_limits = false;
-    lim.max_velocity = max_velocity_;
-    lim.has_acceleration_limits = false;
-    lim.max_acceleration = 0.0;
-    default_limits_.push_back(lim);
-  }
-}
-
-void moveit::core::JointModel::setVariableLimits(const std::vector<moveit_msgs::JointLimits>& jlim)
-{
-  user_specified_limits_.clear();
   for (std::size_t j = 0; j < variable_names_.size(); ++j)
     for (std::size_t i = 0 ; i < jlim.size() ; ++i)
       if (jlim[i].joint_name == variable_names_[j])
       {
-        user_specified_limits_.push_back(jlim[i]);
+        variable_bounds_[j].position_bounded_ = jlim[i].has_position_limits;
+        variable_bounds_[j].min_position_ = jlim[i].min_position;
+        variable_bounds_[j].min_position_ = jlim[i].max_position;
+        variable_bounds_[j].velocity_bounded_ = jlim[i].has_velocity_limits;
+        variable_bounds_[j].min_position_ = -jlim[i].max_velocity;
+        variable_bounds_[j].min_position_ = jlim[i].max_velocity;
+        variable_bounds_[j].acceleration_bounded_ = jlim[i].has_acceleration_limits;
+        variable_bounds_[j].min_acceleration_ = -jlim[i].max_acceleration;
+        variable_bounds_[j].min_acceleration_ = jlim[i].max_acceleration;
         break;
       }
-  if (user_specified_limits_.size() > 0 && user_specified_limits_.size() != variable_names_.size())
+  computeVariableBoundsMsg();
+}
+
+void moveit::core::JointModel::computeVariableBoundsMsg()
+{
+  variable_bounds_msg_.clear();
+  for (std::size_t i = 0; i < variable_bounds_.size(); ++i)
   {
-    logError("Incorrect number of joint limits was specified!");
-    user_specified_limits_.clear();
+    moveit_msgs::JointLimits lim;
+    lim.joint_name = variable_names_[i];
+    lim.has_position_limits = variable_bounds_[i].position_bounded_;
+    lim.min_position = variable_bounds_[i].min_position_;
+    lim.max_position = variable_bounds_[i].max_position_;
+    lim.has_velocity_limits = variable_bounds_[i].velocity_bounded_;
+    lim.max_velocity = std::min(-variable_bounds_[i].min_velocity_, variable_bounds_[i].max_velocity_);
+    lim.has_acceleration_limits = variable_bounds_[i].acceleration_bounded_;
+    lim.max_acceleration = std::min(-variable_bounds_[i].min_acceleration_, variable_bounds_[i].max_acceleration_);
+    variable_bounds_msg_.push_back(lim);
   }
 }
