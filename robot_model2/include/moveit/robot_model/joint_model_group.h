@@ -40,6 +40,7 @@
 #include <moveit/robot_model/joint_model.h>
 #include <moveit/robot_model/link_model.h>
 #include <moveit/kinematics_base/kinematics_base.h>
+#include <boost/container/flat_set.hpp>
 #include <boost/function.hpp>
 #include <set>
 
@@ -61,7 +62,7 @@ class JointModelGroup
 {
 public:
 
-  JointModelGroup(const std::string& name, const std::vector<const JointModel*>& joint_vector, const RobotModel *parent_model);
+  JointModelGroup(const std::string& name, const std::vector<JointModel*>& joint_vector, const RobotModel *parent_model);
 
   ~JointModelGroup();
 
@@ -93,7 +94,7 @@ public:
       This may not be the complete set of joints (see getFixedJointModels() and getMimicJointModels() ) */
   const std::vector<const JointModel*>& getJointModels() const
   {
-    return joint_model_vector_;
+    return joint_model_vector_const_;
   }
 
   /** \brief Get the names of the active joints in this group. These are the names of the joints returned by getJointModels(). */
@@ -221,9 +222,14 @@ public:
   //    return joint_variables_index_map_;
   //  }
 
-  /** \brief get the names of the known default states (as specified in the SRDF) */
-  const std::vector<std::string>& getKnownDefaultStates() const;
-
+  /** \brief Get the names of the known default states (as specified in the SRDF) */
+  const std::vector<std::string>& getDefaultStateNames() const
+  {
+    return default_states_names_;
+  }
+  
+  void addDefaultState(const std::string &name, const std::map<std::string, double> &default_state);
+  
   /** \brief Get the values that correspond to a named state as read from the URDF. Return false on failure. */
   bool getVariableDefaultValues(const std::string &name, std::map<std::string, double> &values) const;
 
@@ -286,6 +292,9 @@ public:
     return variable_count_;
   }
 
+  /** \brief Set the names of the subgroups for this group */
+  void setSubgroupNames(const std::vector<std::string> &subgroups);
+
   /** \brief Get the names of the groups that are subsets of this one (in terms of joints set) */
   const std::vector<std::string>& getSubgroupNames() const
   {
@@ -293,8 +302,11 @@ public:
   }
 
   /** \brief Check if the joints of group \e group are a subset of the joints in this group */
-  bool isSubgroup(const std::string& group) const;
-
+  bool isSubgroup(const std::string& group) const
+  {
+    return subgroup_names_set_.find(group) != subgroup_names_set_.end();
+  }  
+  
   /** \brief Check if this group is a linear chain */
   bool isChain() const
   {
@@ -329,10 +341,13 @@ public:
   double getMaximumExtent(void) const;
 
   /** \brief Get the joint limits (combined from the contained joints) */
-  const std::vector<moveit_msgs::JointLimits>& getVariableBoundsMsg() const;
-
+  const std::vector<moveit_msgs::JointLimits>& getVariableBoundsMsg() const
+  {
+    return variable_bounds_msg_;
+  }
+  
   /** \brief Override joint limits */
-  void setVariableLimits(const std::vector<moveit_msgs::JointLimits>& jlim);
+  void setVariableBounds(const std::vector<moveit_msgs::JointLimits>& jlim);
 
   const std::pair<SolverAllocatorFn, SolverAllocatorMapFn>& getSolverAllocators() const
   {
@@ -397,6 +412,8 @@ public:
 
 protected:
 
+  void computeVariableBoundsMsg();
+
   /** \brief Owner model */
   const RobotModel                                     *parent_model_;
 
@@ -407,10 +424,13 @@ protected:
   std::vector<std::string>                              joint_model_name_vector_;
 
   /** \brief Joint instances in the order they appear in the group state */
-  std::vector<const JointModel*>                        joint_model_vector_;
+  std::vector<JointModel*>                              joint_model_vector_;
+
+  /** \brief Joint instances in the order they appear in the group state */
+  std::vector<const JointModel*>                        joint_model_vector_const_;
 
   /** \brief A map from joint names to their instances */
-  std::map<std::string, const JointModel*>              joint_model_map_;
+  boost::container::flat_map<std::string, const JointModel*> joint_model_map_;
 
   /** \brief The list of joint models that are roots in this group */
   std::vector<const JointModel*>                        joint_roots_;
@@ -418,7 +438,7 @@ protected:
   /** \brief The group includes all the joint variables that make up the joints the group consists of.
       This map gives the position in the state vector of the group for each of these variables.
       Additionaly, it includes the names of the joints and the index for the first variable of that joint. */
-  std::map<std::string, unsigned int>                   joint_variables_index_map_;
+  VariableIndexMap joint_variables_index_map_;
 
   /** \brief The joints that have no DOF (fixed) */
   std::vector<const JointModel*>                        fixed_joints_;
@@ -435,13 +455,21 @@ protected:
   /** \brief The names of the DOF that make up this group (this is just a sequence of joint variable names; not necessarily joint names!) */
   std::set<std::string>                                 active_variable_names_set_;
 
+  /** \brief For each joint model in this group, hold the index at which the corresponding joint state starts in the group state */
+  std::vector<std::size_t>                              joint_model_index_start_;
+  
   /** \brief The links that are on the direct lineage between joints
       and joint_roots_, as well as the children of the joint leafs.
       May not be in any particular order */
   std::vector<const LinkModel*>                         link_model_vector_;
 
+  /** \brief A map from link names to their instances */
+  boost::container::flat_map<std::string, const LinkModel*> link_model_map_;
+
   /** \brief The names of the links in this group */
   std::vector<std::string>                              link_model_name_vector_;
+
+  std::vector<const LinkModel*>                         link_model_with_geometry_vector_;
 
   /** \brief The names of the links in this group that also have geometry */
   std::vector<std::string>                              link_model_with_geometry_name_vector_;
@@ -478,6 +506,9 @@ protected:
   /** \brief The set of labelled subgroups that are included in this group */
   std::vector<std::string>                              subgroup_names_;
 
+  /** \brief The set of labelled subgroups that are included in this group */
+  boost::container::flat_set<std::string>               subgroup_names_set_;
+  
   /** \brief Flag indicating whether this group is an end effector */
   bool                                                  is_end_effector_;
 
@@ -506,6 +537,10 @@ protected:
 
   /** \brief The set of default states specified for this group in the SRDF */
   std::map<std::string, std::map<std::string, double> > default_states_;
+
+  /** \brief The names of the default states specified for this group in the SRDF */
+  std::vector<std::string>                              default_states_names_;
+  
 };
 
 }

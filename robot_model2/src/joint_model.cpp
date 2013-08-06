@@ -73,7 +73,7 @@ std::string moveit::core::JointModel::getTypeName() const
 
 const moveit::core::VariableBounds& moveit::core::JointModel::getVariableBounds(const std::string& variable) const
 {
-  boost::container::flat_map<std::string, std::size_t>::const_iterator it = variable_index_map_.find(variable);
+  VariableIndexMap::const_iterator it = variable_index_map_.find(variable);
   if (it == variable_index_map_.end())
     throw Exception("Could not find variable '" + variable + "' to get bounds for within joint '" + name_ + "'");
   return variable_bounds_[it->second];
@@ -81,7 +81,7 @@ const moveit::core::VariableBounds& moveit::core::JointModel::getVariableBounds(
 
 void moveit::core::JointModel::setVariableBounds(const std::string& variable, const VariableBounds& bounds)
 {
-  boost::container::flat_map<std::string, std::size_t>::const_iterator it = variable_index_map_.find(variable);
+  VariableIndexMap::const_iterator it = variable_index_map_.find(variable);
   if (it == variable_index_map_.end())
     throw Exception("Could not find variable '" + variable + "' to get bounds for within joint '" + name_ + "'");
   variable_bounds_[it->second] = bounds;

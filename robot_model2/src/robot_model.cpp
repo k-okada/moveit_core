@@ -1,7 +1,7 @@
 /*********************************************************************
  * Software License Agreement (BSD License)
  *
- *  Copyright (c) 2008, Willow Garage, Inc.
+ *  Copyright (c) 2013, Willow Garage, Inc.
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -32,7 +32,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-/* Author: Ioan Sucan, E. Gil Jones */
+/* Author: Ioan Sucan */
 
 #include <moveit/robot_model/robot_model.h>
 #include <geometric_shapes/shape_operations.h>
@@ -45,8 +45,8 @@
 
 /* ------------------------ RobotModel ------------------------ */
 
-robot_model::RobotModel::RobotModel(const boost::shared_ptr<const urdf::ModelInterface> &urdf_model,
-                                    const boost::shared_ptr<const srdf::Model> &srdf_model)
+moveit::core::RobotModel::RobotModel(const boost::shared_ptr<const urdf::ModelInterface> &urdf_model,
+                                     const boost::shared_ptr<const srdf::Model> &srdf_model)
 {
   root_joint_ = NULL;
   urdf_ = urdf_model;
@@ -54,7 +54,7 @@ robot_model::RobotModel::RobotModel(const boost::shared_ptr<const urdf::ModelInt
   buildModel(*urdf_model, *srdf_model);
 }
 
-robot_model::RobotModel::~RobotModel()
+moveit::core::RobotModel::~RobotModel()
 {
   for (std::map<std::string, JointModelGroup*>::iterator it = joint_model_group_map_.begin() ; it != joint_model_group_map_.end() ; ++it)
     delete it->second;
@@ -78,7 +78,7 @@ const moveit::core::LinkModel* moveit::core::RobotModel::getRootLink() const
   throw Exception("No root link in robot model");
 }
 
-void robot_model::RobotModel::buildModel(const urdf::ModelInterface &urdf_model, const srdf::Model &srdf_model)
+void moveit::core::RobotModel::buildModel(const urdf::ModelInterface &urdf_model, const srdf::Model &srdf_model)
 {
   moveit::tools::Profiler::ScopedStart prof_start;
   moveit::tools::Profiler::ScopedBlock prof_block("RobotModel::buildModel");
@@ -110,7 +110,7 @@ void robot_model::RobotModel::buildModel(const urdf::ModelInterface &urdf_model,
     logWarn("No root link found");
 }
 
-void robot_model::RobotModel::buildJointInfo()
+void moveit::core::RobotModel::buildJointInfo()
 {
   // construct additional maps for easy access by name
   variable_count_ = 0;
@@ -164,7 +164,7 @@ void robot_model::RobotModel::buildJointInfo()
   }
 }
 
-void robot_model::RobotModel::buildGroupStates(const srdf::Model &srdf_model)
+void moveit::core::RobotModel::buildGroupStates(const srdf::Model &srdf_model)
 {
   // copy the default states to the groups
   const std::vector<srdf::Model::GroupState> &ds = srdf_model.getGroupStates();
@@ -194,7 +194,7 @@ void robot_model::RobotModel::buildGroupStates(const srdf::Model &srdf_model)
   }
 }
 
-void robot_model::RobotModel::buildMimic(const urdf::ModelInterface &urdf_model)
+void moveit::core::RobotModel::buildMimic(const urdf::ModelInterface &urdf_model)
 {
   // compute mimic joints
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
@@ -245,12 +245,12 @@ void robot_model::RobotModel::buildMimic(const urdf::ModelInterface &urdf_model)
         joint_model_vector_[i]->mimic_->mimic_requests_.push_back(joint_model_vector_[i]);
 }
 
-bool robot_model::RobotModel::hasEndEffector(const std::string& eef) const
+bool moveit::core::RobotModel::hasEndEffector(const std::string& eef) const
 {
   return end_effectors_.find(eef) != end_effectors_.end();
 }
 
-const robot_model::JointModelGroup* robot_model::RobotModel::getEndEffector(const std::string& name) const
+const moveit::core::JointModelGroup* moveit::core::RobotModel::getEndEffector(const std::string& name) const
 {
   std::map<std::string, JointModelGroup*>::const_iterator it = end_effectors_.find(name);
   if (it == end_effectors_.end())
@@ -264,7 +264,7 @@ const robot_model::JointModelGroup* robot_model::RobotModel::getEndEffector(cons
   return it->second;
 }
 
-robot_model::JointModelGroup* robot_model::RobotModel::getEndEffector(const std::string& name)
+moveit::core::JointModelGroup* moveit::core::RobotModel::getEndEffector(const std::string& name)
 {
   std::map<std::string, JointModelGroup*>::const_iterator it = end_effectors_.find(name);
   if (it == end_effectors_.end())
@@ -278,12 +278,12 @@ robot_model::JointModelGroup* robot_model::RobotModel::getEndEffector(const std:
   return it->second;
 }
 
-bool robot_model::RobotModel::hasJointModelGroup(const std::string &name) const
+bool moveit::core::RobotModel::hasJointModelGroup(const std::string &name) const
 {
   return joint_model_group_map_.find(name) != joint_model_group_map_.end();
 }
 
-const robot_model::JointModelGroup* robot_model::RobotModel::getJointModelGroup(const std::string& name) const
+const moveit::core::JointModelGroup* moveit::core::RobotModel::getJointModelGroup(const std::string& name) const
 {
   std::map<std::string, JointModelGroup*>::const_iterator it = joint_model_group_map_.find(name);
   if (it == joint_model_group_map_.end())
@@ -294,7 +294,7 @@ const robot_model::JointModelGroup* robot_model::RobotModel::getJointModelGroup(
   return it->second;
 }
 
-robot_model::JointModelGroup* robot_model::RobotModel::getJointModelGroup(const std::string& name)
+moveit::core::JointModelGroup* moveit::core::RobotModel::getJointModelGroup(const std::string& name)
 {
   std::map<std::string, JointModelGroup*>::const_iterator it = joint_model_group_map_.find(name);
   if (it == joint_model_group_map_.end())
@@ -305,7 +305,7 @@ robot_model::JointModelGroup* robot_model::RobotModel::getJointModelGroup(const 
   return it->second;
 }
 
-void robot_model::RobotModel::buildGroups(const srdf::Model &srdf_model)
+void moveit::core::RobotModel::buildGroups(const srdf::Model &srdf_model)
 {
   const std::vector<srdf::Model::Group>& group_configs = srdf_model.getGroups();
 
@@ -347,7 +347,7 @@ void robot_model::RobotModel::buildGroups(const srdf::Model &srdf_model)
   buildGroupsInfo_EndEffectors(srdf_model);
 }
 
-void robot_model::RobotModel::buildGroupsInfo_Subgroups(const srdf::Model &srdf_model)
+void moveit::core::RobotModel::buildGroupsInfo_Subgroups(const srdf::Model &srdf_model)
 {
   // compute subgroups
   for (std::map<std::string, JointModelGroup*>::const_iterator it = joint_model_group_map_.begin() ; it != joint_model_group_map_.end(); ++it)
@@ -373,7 +373,7 @@ void robot_model::RobotModel::buildGroupsInfo_Subgroups(const srdf::Model &srdf_
   }
 }
 
-void robot_model::RobotModel::buildGroupsInfo_EndEffectors(const srdf::Model &srdf_model)
+void moveit::core::RobotModel::buildGroupsInfo_EndEffectors(const srdf::Model &srdf_model)
 {
   // set the end-effector flags
   const std::vector<srdf::Model::EndEffector> &eefs = srdf_model.getEndEffectors();
@@ -447,7 +447,7 @@ void robot_model::RobotModel::buildGroupsInfo_EndEffectors(const srdf::Model &sr
   }
 }
 
-bool robot_model::RobotModel::addJointModelGroup(const srdf::Model::Group& gc)
+bool moveit::core::RobotModel::addJointModelGroup(const srdf::Model::Group& gc)
 {
   if (joint_model_group_map_.find(gc.name_) != joint_model_group_map_.end())
   {
@@ -569,7 +569,7 @@ bool robot_model::RobotModel::addJointModelGroup(const srdf::Model::Group& gc)
   return true;
 }
 
-robot_model::JointModel* robot_model::RobotModel::buildRecursive(LinkModel *parent, const urdf::Link *urdf_link,
+moveit::core::JointModel* moveit::core::RobotModel::buildRecursive(LinkModel *parent, const urdf::Link *urdf_link,
                                                                  const srdf::Model &srdf_model)
 {
   // construct the joint
@@ -616,7 +616,7 @@ robot_model::JointModel* robot_model::RobotModel::buildRecursive(LinkModel *pare
   return joint;
 }
 
-robot_model::JointModel* robot_model::RobotModel::constructJointModel(const urdf::Joint *urdf_joint, const urdf::Link *child_link,
+moveit::core::JointModel* moveit::core::RobotModel::constructJointModel(const urdf::Joint *urdf_joint, const urdf::Link *child_link,
                                                                       const srdf::Model &srdf_model)
 {
   JointModel* result = NULL;
@@ -768,7 +768,7 @@ static inline Eigen::Affine3d urdfPose2Affine3d(const urdf::Pose &pose)
 
 }
 
-robot_model::LinkModel* robot_model::RobotModel::constructLinkModel(const urdf::Link *urdf_link)
+moveit::core::LinkModel* moveit::core::RobotModel::constructLinkModel(const urdf::Link *urdf_link)
 {
   LinkModel *result = new LinkModel();
   result->name_ = urdf_link->name;
@@ -838,7 +838,7 @@ robot_model::LinkModel* robot_model::RobotModel::constructLinkModel(const urdf::
   return result;
 }
 
-shapes::ShapePtr robot_model::RobotModel::constructShape(const urdf::Geometry *geom)
+shapes::ShapePtr moveit::core::RobotModel::constructShape(const urdf::Geometry *geom)
 {
   moveit::tools::Profiler::ScopedBlock prof_block("RobotModel::constructShape");
 
@@ -877,17 +877,17 @@ shapes::ShapePtr robot_model::RobotModel::constructShape(const urdf::Geometry *g
   return shapes::ShapePtr(result);
 }
 
-bool robot_model::RobotModel::hasJointModel(const std::string &name) const
+bool moveit::core::RobotModel::hasJointModel(const std::string &name) const
 {
   return joint_model_map_.find(name) != joint_model_map_.end();
 }
 
-bool robot_model::RobotModel::hasLinkModel(const std::string &name) const
+bool moveit::core::RobotModel::hasLinkModel(const std::string &name) const
 {
   return link_model_map_.find(name) != link_model_map_.end();
 }
 
-const robot_model::JointModel* robot_model::RobotModel::getJointModel(const std::string &name) const
+const moveit::core::JointModel* moveit::core::RobotModel::getJointModel(const std::string &name) const
 {
   std::map<std::string, JointModel*>::const_iterator it = joint_model_map_.find(name);
   if (it != joint_model_map_.end())
@@ -895,7 +895,7 @@ const robot_model::JointModel* robot_model::RobotModel::getJointModel(const std:
   throw Exception("Joint '" + name + "' not found in model '" + model_name + "'");
 }
 
-const robot_model::LinkModel* robot_model::RobotModel::getLinkModel(const std::string &name) const
+const moveit::core::LinkModel* moveit::core::RobotModel::getLinkModel(const std::string &name) const
 {
   std::map<std::string, LinkModel*>::const_iterator it = link_model_map_.find(name);
   if (it != link_model_map_.end())
@@ -903,7 +903,7 @@ const robot_model::LinkModel* robot_model::RobotModel::getLinkModel(const std::s
   throw Exception("Link '" + name + "' not found in model '" + model_name + "'");
 }
 
-void robot_model::RobotModel::getChildLinkModels(const LinkModel *parent, std::vector<const LinkModel*> &links) const
+void moveit::core::RobotModel::getChildLinkModels(const LinkModel *parent, std::vector<const LinkModel*> &links) const
 {
   links.clear();
   links.push_back(parent);
@@ -928,12 +928,12 @@ void robot_model::RobotModel::getChildLinkModels(const LinkModel *parent, std::v
   }
 }
 
-void robot_model::RobotModel::getChildLinkModels(const JointModel *parent, std::vector<const LinkModel*> &links) const
+void moveit::core::RobotModel::getChildLinkModels(const JointModel *parent, std::vector<const LinkModel*> &links) const
 {
   getChildLinkModels(parent->child_link_model_, links);
 }
 
-void robot_model::RobotModel::getChildJointModels(const LinkModel *parent, std::vector<const JointModel*> &joints) const
+void moveit::core::RobotModel::getChildJointModels(const LinkModel *parent, std::vector<const JointModel*> &joints) const
 {
   joints.clear();
   std::queue<const LinkModel*> q;
@@ -958,13 +958,13 @@ void robot_model::RobotModel::getChildJointModels(const LinkModel *parent, std::
   }
 }
 
-void robot_model::RobotModel::getChildJointModels(const JointModel *parent, std::vector<const JointModel*> &joints) const
+void moveit::core::RobotModel::getChildJointModels(const JointModel *parent, std::vector<const JointModel*> &joints) const
 {
   getChildJointModels(parent->child_link_model_, joints);
   joints.insert(joints.begin(), parent);
 }
 
-std::vector<std::string> robot_model::RobotModel::getChildLinkModelNames(const LinkModel *parent) const
+std::vector<std::string> moveit::core::RobotModel::getChildLinkModelNames(const LinkModel *parent) const
 {
   std::vector<const LinkModel*> links;
   getChildLinkModels(parent, links);
@@ -974,7 +974,7 @@ std::vector<std::string> robot_model::RobotModel::getChildLinkModelNames(const L
   return ret_vec;
 }
 
-std::vector<std::string> robot_model::RobotModel::getChildLinkModelNames(const JointModel *parent) const
+std::vector<std::string> moveit::core::RobotModel::getChildLinkModelNames(const JointModel *parent) const
 {
   std::vector<const LinkModel*> links;
   getChildLinkModels(parent, links);
@@ -984,7 +984,7 @@ std::vector<std::string> robot_model::RobotModel::getChildLinkModelNames(const J
   return ret_vec;
 }
 
-std::vector<std::string> robot_model::RobotModel::getChildJointModelNames(const LinkModel *parent) const
+std::vector<std::string> moveit::core::RobotModel::getChildJointModelNames(const LinkModel *parent) const
 {
   std::vector<const JointModel*> joints;
   getChildJointModels(parent, joints);
@@ -994,7 +994,7 @@ std::vector<std::string> robot_model::RobotModel::getChildJointModelNames(const 
   return ret_vec;
 }
 
-std::vector<std::string> robot_model::RobotModel::getChildJointModelNames(const JointModel *parent) const
+std::vector<std::string> moveit::core::RobotModel::getChildJointModelNames(const JointModel *parent) const
 {
   std::vector<const JointModel*> joints;
   getChildJointModels(parent, joints);
@@ -1005,35 +1005,35 @@ std::vector<std::string> robot_model::RobotModel::getChildJointModelNames(const 
 }
 
 
-void robot_model::RobotModel::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values) const
+void moveit::core::RobotModel::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values) const
 {
   for (std::size_t i = 0  ; i < joint_model_vector_.size() ; ++i)
     if (joint_model_vector_[i]->mimic_ == NULL)
       joint_model_vector_[i]->getVariableRandomValues(rng, values);
 }
 
-void robot_model::RobotModel::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::map<std::string, double> &values) const
+void moveit::core::RobotModel::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::map<std::string, double> &values) const
 {
   for (std::size_t i = 0  ; i < joint_model_vector_.size() ; ++i)
     if (joint_model_vector_[i]->mimic_ == NULL)
       joint_model_vector_[i]->getVariableRandomValues(rng, values);
 }
 
-void robot_model::RobotModel::getVariableDefaultValues(std::vector<double> &values) const
+void moveit::core::RobotModel::getVariableDefaultValues(std::vector<double> &values) const
 {
   for (std::size_t i = 0  ; i < joint_model_vector_.size() ; ++i)
     if (joint_model_vector_[i]->mimic_ == NULL)
       joint_model_vector_[i]->getVariableDefaultValues(values);
 }
 
-void robot_model::RobotModel::getVariableDefaultValues(std::map<std::string, double> &values) const
+void moveit::core::RobotModel::getVariableDefaultValues(std::map<std::string, double> &values) const
 {
   for (std::size_t i = 0  ; i < joint_model_vector_.size() ; ++i)
     if (joint_model_vector_[i]->mimic_ == NULL)
       joint_model_vector_[i]->getVariableDefaultValues(values);
 }
 
-void robot_model::RobotModel::setKinematicsAllocators(const std::map<std::string, SolverAllocatorFn> &allocators)
+void moveit::core::RobotModel::setKinematicsAllocators(const std::map<std::string, SolverAllocatorFn> &allocators)
 {
   for (std::map<std::string, JointModelGroup*>::const_iterator it = joint_model_group_map_.begin() ; it != joint_model_group_map_.end() ; ++it)
   {
@@ -1089,7 +1089,7 @@ void robot_model::RobotModel::setKinematicsAllocators(const std::map<std::string
   }
 }
 
-void robot_model::RobotModel::printModelInfo(std::ostream &out) const
+void moveit::core::RobotModel::printModelInfo(std::ostream &out) const
 {
   out << "Model " << model_name_ << " in frame " << model_frame_ << ", of dimension " << getVariableCount() << std::endl;
 
@@ -1147,7 +1147,7 @@ void robot_model::RobotModel::printModelInfo(std::ostream &out) const
   }
 }
 
-void robot_model::RobotModel::computeFixedTransforms(LinkModel *link, const Eigen::Affine3d &transform, LinkModelToAffine3dMap &associated_transforms)
+void moveit::core::RobotModel::computeFixedTransforms(LinkModel *link, const Eigen::Affine3d &transform, LinkModelToAffine3dMap &associated_transforms)
 {
   associated_transforms[link] = transform;
   for (std::size_t i = 0 ; i < link->getChildJointModels().size() ; ++i)

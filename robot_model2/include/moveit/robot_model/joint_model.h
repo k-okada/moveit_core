@@ -76,7 +76,10 @@ struct VariableBounds
   double max_acceleration_;
   bool acceleration_bounded_;
 };
-  
+
+/** \brief Data type for holding mappings from variable names to their position in a state vector */
+typedef boost::container::flat_map<std::string, std::size_t> VariableIndexMap;
+
 class LinkModel;
 
 /** \brief A joint from the robot. Models the transform that
@@ -301,6 +304,12 @@ public:
     return mimic_requests_;
   }
 
+  /** \brief Get all the link models that descend from this joint, in the kinematic tree */
+  const std::vector<const LinkModel*>& getDescendantLinkModels() const
+  {
+    return descendant_link_models_;
+  }
+  
   /** \brief Check if this joint is passive */
   bool isPassive() const
   {
@@ -353,7 +362,7 @@ protected:
   std::vector<moveit_msgs::JointLimits>                variable_bounds_msg_;
   
   /** \brief Map from variable names to the corresponding index in variable_names_ (indexing makes sense within the JointModel only) */
-  boost::container::flat_map<std::string, std::size_t> variable_index_map_;
+  VariableIndexMap                                     variable_index_map_;
 
   std::vector<std::size_t>                             variable_index_;
 
@@ -374,7 +383,10 @@ protected:
 
   /** \brief The set of joints that should get a value copied to them when this joint changes */
   std::vector<const JointModel*>                       mimic_requests_;
-
+  
+  /** \brief Pointers to all the links that will be moved if this joint changes value */
+  std::vector<const LinkModel*>                        descendant_link_models_;
+  
   /** \brief Specify whether this joint is marked as passive in the SRDF */
   bool                                                 passive_;
 

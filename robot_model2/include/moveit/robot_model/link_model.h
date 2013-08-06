@@ -37,13 +37,13 @@
 #ifndef MOVEIT_CORE_ROBOT_MODEL_LINK_MODEL_
 #define MOVEIT_CORE_ROBOT_MODEL_LINK_MODEL_
 
-#include <map>
 #include <string>
 #include <vector>
 #include <utility>
 #include <Eigen/Geometry>
 #include <geometric_shapes/shapes.h>
 #include <geometric_shapes/shape_messages.h>
+#include <boost/container/flat_map.hpp>
 #include <eigen_stl_containers/eigen_stl_vector_container.h>
 
 namespace moveit
@@ -61,8 +61,8 @@ public:
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  typedef std::map<const LinkModel*, Eigen::Affine3d, std::less<const LinkModel*>,
-                   Eigen::aligned_allocator<std::pair<const LinkModel*, Eigen::Affine3d> > > AssociatedFixedTransformMap;
+  typedef boost::container::flat_map<const LinkModel*, Eigen::Affine3d, std::less<const LinkModel*>,
+                                     Eigen::aligned_allocator<std::pair<const LinkModel*, Eigen::Affine3d> > > AssociatedFixedTransformMap;
 
   LinkModel();
   ~LinkModel();
@@ -153,11 +153,8 @@ private:
   /** \brief JointModel that connects this link to the parent link */
   const JointModel         *parent_joint_model_;
 
-  /** \brief List of descending joints (each connects to a child link) */
+  /** \brief List of directly descending joints (each connects to a child link) */
   std::vector<const JointModel*> child_joint_models_;
-
-  /** \brief The set of links that are attached to this one via fixed transforms */
-  AssociatedFixedTransformMap associated_fixed_transforms_;
 
   /** \brief The constant transform applied to the link (local) */
   Eigen::Affine3d           joint_origin_transform_;
@@ -165,6 +162,9 @@ private:
   /** \brief The constant transform applied to the collision geometry of the link (local) */
   EigenSTL::vector_Affine3d collision_origin_transform_;
 
+  /** \brief The set of links that are attached to this one via fixed transforms */
+  AssociatedFixedTransformMap associated_fixed_transforms_;
+  
   /** \brief The collision geometry of the link */
   std::vector<shapes::ShapeConstPtr> shapes_;
 
