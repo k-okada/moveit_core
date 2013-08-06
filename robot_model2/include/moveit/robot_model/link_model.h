@@ -1,7 +1,7 @@
 /*********************************************************************
 * Software License Agreement (BSD License)
 *
-*  Copyright (c) 2012, Willow Garage, Inc.
+*  Copyright (c) 2013, Willow Garage, Inc.
 *  All rights reserved.
 *
 *  Redistribution and use in source and binary forms, with or without
@@ -57,7 +57,6 @@ class JointModel;
 /** \brief A link from the robot. Contains the constant transform applied to the link and its geometry */
 class LinkModel
 {
-  friend class RobotModel;
 public:
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

@@ -1,7 +1,7 @@
 /*********************************************************************
 * Software License Agreement (BSD License)
 *
-*  Copyright (c) 2012, Willow Garage, Inc.
+*  Copyright (c) 2013, Willow Garage, Inc.
 *  All rights reserved.
 *
 *  Redistribution and use in source and binary forms, with or without
@@ -34,8 +34,8 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_ROBOT_MODEL_PLANAR_JOINT_MODEL_
-#define MOVEIT_ROBOT_MODEL_PLANAR_JOINT_MODEL_
+#ifndef MOVEIT_CORE_ROBOT_MODEL_PLANAR_JOINT_MODEL_
+#define MOVEIT_CORE_ROBOT_MODEL_PLANAR_JOINT_MODEL_
 
 #include <moveit/robot_model/joint_model.h>
 

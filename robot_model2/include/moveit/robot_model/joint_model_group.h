@@ -1,7 +1,7 @@
 /*********************************************************************
 * Software License Agreement (BSD License)
 *
-*  Copyright (c) 2012, Willow Garage, Inc.
+*  Copyright (c) 2013, Willow Garage, Inc.
 *  All rights reserved.
 *
 *  Redistribution and use in source and binary forms, with or without
@@ -34,8 +34,8 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_ROBOT_MODEL_JOINT_MODEL_GROUP_
-#define MOVEIT_ROBOT_MODEL_JOINT_MODEL_GROUP_
+#ifndef MOVEIT_CORE_ROBOT_MODEL_JOINT_MODEL_GROUP_
+#define MOVEIT_CORE_ROBOT_MODEL_JOINT_MODEL_GROUP_
 
 #include <moveit/robot_model/joint_model.h>
 #include <moveit/robot_model/link_model.h>
@@ -43,7 +43,9 @@
 #include <boost/function.hpp>
 #include <set>
 
-namespace robot_model
+namespace moveit
+{
+namespace core
 {
 
 class RobotModel;
@@ -57,8 +59,6 @@ typedef std::map<const JointModelGroup*, SolverAllocatorFn> SolverAllocatorMapFn
 
 class JointModelGroup
 {
-  friend class RobotModel;
-
 public:
 
   JointModelGroup(const std::string& name, const std::vector<const JointModel*>& joint_vector, const RobotModel *parent_model);
@@ -216,31 +216,69 @@ public:
   /** \brief A joint group consists of an array of joints. Each joint has a specific ordering of its variables.
       Given the ordering of joints the group maintains, an ordering of all the variables of the group can be then constructed.
       The map from variable names to their position in the joint group state is given by this function */
-  const std::map<std::string, unsigned int>& getJointVariablesIndexMap() const
-  {
-    return joint_variables_index_map_;
-  }
+  //  const std::map<std::string, unsigned int>& getJointVariablesIndexMap() const
+  //  {
+  //    return joint_variables_index_map_;
+  //  }
 
   /** \brief get the names of the known default states (as specified in the SRDF) */
-  void getKnownDefaultStates(std::vector<std::string> &default_states) const;
+  const std::vector<std::string>& getKnownDefaultStates() const;
 
   /** \brief Get the values that correspond to a named state as read from the URDF. Return false on failure. */
   bool getVariableDefaultValues(const std::string &name, std::map<std::string, double> &values) const;
 
   /** \brief Compute the default values for the joint group */
-  void getVariableDefaultValues(std::vector<double> &values) const;
-
-  /** \brief Compute the default values for the joint group */
   void getVariableDefaultValues(std::map<std::string, double> &values) const;
 
-  /** \brief Compute random values for the state of the joint group */
-  void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values) const;
+  /** \brief Compute the default values for the joint group */
+  void getVariableDefaultValues(std::vector<double> &values) const
+  {
+    values.resize(variable_count_);
+    getVariableDefaultValues(&values[0]);
+  }
+
+  /** \brief Compute the default values for the joint group */
+  void getVariableDefaultValues(double *values) const;
 
   /** \brief Compute random values for the state of the joint group */
-  void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const std::vector<double> &near, const std::map<robot_model::JointModel::JointType, double> &distance_map) const;
+  void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, double *values) const;
+  
+  /** \brief Compute random values for the state of the joint group */
+  void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values) const
+  {
+    values.resize(variable_count_);
+    getVariableRandomValues(rng, &values[0]);
+  }
+  
+  /** \brief Compute random values for the state of the joint group */
+  void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const double *near, const double distance) const;
+  
+  /** \brief Compute random values for the state of the joint group */
+  void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const std::vector<double> &near, double distance) const
+  {
+    values.resize(variable_count_);
+    getVariableRandomValuesNearBy(rng, &values[0], &near[0], distance);
+  }  
 
   /** \brief Compute random values for the state of the joint group */
-  void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const std::vector<double> &near, const std::vector<double> &distances) const;
+  void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const double *near, const std::map<JointModel::JointType, double> &distance_map) const;
+
+  /** \brief Compute random values for the state of the joint group */
+  void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const std::vector<double> &near, const std::map<JointModel::JointType, double> &distance_map) const
+  {
+    values.resize(variable_count_);
+    getVariableRandomValuesNearBy(rng, &values[0], &near[0], distance_map);
+  }
+  
+  /** \brief Compute random values for the state of the joint group */
+  void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const double *near, const std::vector<double> &distances) const;
+  
+  /** \brief Compute random values for the state of the joint group */
+  void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const std::vector<double> &near, const std::vector<double> &distances) const
+  {
+    values.resize(variable_count_);
+    getVariableRandomValuesNearBy(rng, &values[0], &near[0], distances);
+  }  
 
   /** \brief Get the number of variables that describe this joint group */
   unsigned int getVariableCount() const
@@ -290,11 +328,8 @@ public:
   /** \brief Get the extent of the state space (the maximum value distance() can ever report for this group) */
   double getMaximumExtent(void) const;
 
-  /** \brief Get the joint limits as read from the URDF */
-  std::vector<moveit_msgs::JointLimits> getVariableDefaultLimits() const;
-
-  /** \brief Get the joint limits specified by the user with setJointLimits() or the default joint limits using getVariableDefaultLimits(), if no joint limits were specified. */
-  std::vector<moveit_msgs::JointLimits> getVariableLimits() const;
+  /** \brief Get the joint limits (combined from the contained joints) */
+  const std::vector<moveit_msgs::JointLimits>& getVariableBoundsMsg() const;
 
   /** \brief Override joint limits */
   void setVariableLimits(const std::vector<moveit_msgs::JointLimits>& jlim);
@@ -323,10 +358,10 @@ public:
 
   bool canSetStateFromIK(const std::string &tip) const;
 
-  bool setRedundantJoints(const std::vector<unsigned int> &joints)
+  bool setRedundantJoints(const std::vector<std::string> &joints)
   {
-    if(solver_instance_)
-      return (solver_instance_->setRedundantJoints(joints));
+    if (solver_instance_)
+      return solver_instance_->setRedundantJoints(joints);
     return false;
   }
 
@@ -363,7 +398,7 @@ public:
 protected:
 
   /** \brief Owner model */
-  const RobotModel                                 *parent_model_;
+  const RobotModel                                     *parent_model_;
 
   /** \brief Name of group */
   std::string                                           name_;
@@ -438,6 +473,8 @@ protected:
   /** \brief The number of variables necessary to describe this group of joints */
   unsigned int                                          variable_count_;
 
+  std::vector<moveit_msgs::JointLimits>                 variable_bounds_msg_;
+  
   /** \brief The set of labelled subgroups that are included in this group */
   std::vector<std::string>                              subgroup_names_;
 
@@ -471,6 +508,7 @@ protected:
   std::map<std::string, std::map<std::string, double> > default_states_;
 };
 
+}
 }
 
 #endif

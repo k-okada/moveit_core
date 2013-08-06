@@ -1,7 +1,7 @@
 /*********************************************************************
 * Software License Agreement (BSD License)
 *
-*  Copyright (c) 2008, Willow Garage, Inc.
+*  Copyright (c) 2013, Willow Garage, Inc.
 *  All rights reserved.
 *
 *  Redistribution and use in source and binary forms, with or without
@@ -38,7 +38,9 @@
 #include <moveit/robot_model/robot_model.h>
 #include <algorithm>
 
-namespace robot_model
+namespace moveit
+{
+namespace core
 {
 namespace
 {
@@ -83,10 +85,11 @@ bool includesParent(const JointModel *joint, const JointModelGroup *group)
 
 }
 }
+}
 
-robot_model::JointModelGroup::JointModelGroup(const std::string& group_name,
-                          const std::vector<const JointModel*> &unsorted_group_joints,
-                          const RobotModel* parent_model) :
+moveit::core::JointModelGroup::JointModelGroup(const std::string& group_name,
+                                               const std::vector<const JointModel*> &unsorted_group_joints,
+                                               const RobotModel* parent_model) :
   parent_model_(parent_model), name_(group_name),
   variable_count_(0), is_end_effector_(false), is_chain_(false),
   default_ik_timeout_(0.5), default_ik_attempts_(2)
@@ -94,7 +97,7 @@ robot_model::JointModelGroup::JointModelGroup(const std::string& group_name,
   // sort joints in Depth-First order
   std::vector<const JointModel*> group_joints = unsorted_group_joints;
   std::sort(group_joints.begin(), group_joints.end(), &orderJointsByIndex);
-
+  
   for (std::size_t i = 0 ; i < group_joints.size() ; ++i)
   {
     joint_model_map_[group_joints[i]->getName()] = group_joints[i];
@@ -108,14 +111,14 @@ robot_model::JointModelGroup::JointModelGroup(const std::string& group_name,
       }
       else
         mimic_joints_.push_back(group_joints[i]);
-
+      
       if (group_joints[i]->getType() == JointModel::REVOLUTE && static_cast<const RevoluteJointModel*>(group_joints[i])->isContinuous())
         continuous_joint_model_vector_const_.push_back(group_joints[i]);
     }
     else
       fixed_joints_.push_back(group_joints[i]);
   }
-
+  
   //now we need to find all the set of joints within this group
   //that root distinct subtrees
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
@@ -127,7 +130,7 @@ robot_model::JointModelGroup::JointModelGroup(const std::string& group_name,
     if (!includesParent(joint, this))
       joint_roots_.push_back(joint_model_vector_[i]);
   }
-
+  
   // compute joint_variables_index_map_
   unsigned int vector_index_counter = 0;
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
@@ -142,7 +145,7 @@ robot_model::JointModelGroup::JointModelGroup(const std::string& group_name,
     joint_variables_index_map_[joint_model_vector_[i]->getName()] = vector_index_counter;
     vector_index_counter += name_order.size();
   }
-
+  
   for (std::size_t i = 0 ; i < mimic_joints_.size() ; ++i)
   {
     const std::vector<std::string>& name_order = mimic_joints_[i]->getVariableNames();
@@ -151,15 +154,15 @@ robot_model::JointModelGroup::JointModelGroup(const std::string& group_name,
       joint_variables_index_map_[name_order[j]] = joint_variables_index_map_[mim_name_order[j]];
     joint_variables_index_map_[mimic_joints_[i]->getName()] = joint_variables_index_map_[mimic_joints_[i]->getMimic()->getName()];
   }
-
+  
   // now we need to make another pass for group links (we include the fixed joints here)
   std::set<const LinkModel*> group_links_set;
   for (std::size_t i = 0 ; i < group_joints.size() ; ++i)
     group_links_set.insert(group_joints[i]->getChildLinkModel());
-
+  
   for (std::set<const LinkModel*>::iterator it = group_links_set.begin(); it != group_links_set.end(); ++it)
     link_model_vector_.push_back(*it);
-
+  
   std::sort(link_model_vector_.begin(), link_model_vector_.end(), &orderLinksByIndex);
   for (std::size_t i = 0 ; i < link_model_vector_.size() ; ++i)
   {
@@ -167,7 +170,7 @@ robot_model::JointModelGroup::JointModelGroup(const std::string& group_name,
     if (link_model_vector_[i]->getShape())
       link_model_with_geometry_name_vector_.push_back(link_model_vector_[i]->getName());
   }
-
+  
   // compute updated links
   std::set<const LinkModel*> u_links;
   for (std::size_t i = 0 ; i < joint_roots_.size() ; ++i)
@@ -194,7 +197,7 @@ robot_model::JointModelGroup::JointModelGroup(const std::string& group_name,
     updated_link_model_name_vector_.push_back(updated_link_model_vector_[i]->getName());
   for (std::size_t i = 0; i < updated_link_model_with_geometry_vector_.size(); ++i)
     updated_link_model_with_geometry_name_vector_.push_back(updated_link_model_with_geometry_vector_[i]->getName());
-
+  
   // check if this group should actually be a chain
   if (joint_roots_.size() == 1 && joint_model_vector_.size() > 1 && !is_chain_)
   {
@@ -211,11 +214,11 @@ robot_model::JointModelGroup::JointModelGroup(const std::string& group_name,
   }
 }
 
-robot_model::JointModelGroup::~JointModelGroup()
+moveit::core::JointModelGroup::~JointModelGroup()
 {
 }
 
-bool robot_model::JointModelGroup::isSubgroup(const std::string& group) const
+bool moveit::core::JointModelGroup::isSubgroup(const std::string& group) const
 {
   for (std::size_t i = 0; i < subgroup_names_.size(); ++i)
     if (group == subgroup_names_[i])
@@ -223,17 +226,17 @@ bool robot_model::JointModelGroup::isSubgroup(const std::string& group) const
   return false;
 }
 
-bool robot_model::JointModelGroup::hasJointModel(const std::string &joint) const
+bool moveit::core::JointModelGroup::hasJointModel(const std::string &joint) const
 {
   return joint_model_map_.find(joint) != joint_model_map_.end();
 }
 
-bool robot_model::JointModelGroup::hasLinkModel(const std::string &link) const
+bool moveit::core::JointModelGroup::hasLinkModel(const std::string &link) const
 {
   return std::find(link_model_name_vector_.begin(), link_model_name_vector_.end(), link) != link_model_name_vector_.end();
 }
 
-const robot_model::JointModel* robot_model::JointModelGroup::getJointModel(const std::string &name) const
+const moveit::core::JointModel* moveit::core::JointModelGroup::getJointModel(const std::string &name) const
 {
   std::map<std::string, const JointModel*>::const_iterator it = joint_model_map_.find(name);
   if (it == joint_model_map_.end())
@@ -245,13 +248,13 @@ const robot_model::JointModel* robot_model::JointModelGroup::getJointModel(const
     return it->second;
 }
 
-void robot_model::JointModelGroup::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values) const
+void moveit::core::JointModelGroup::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values) const
 {
   for (std::size_t i = 0  ; i < joint_model_vector_.size() ; ++i)
     joint_model_vector_[i]->getVariableRandomValues(rng, values);
 }
 
-void robot_model::JointModelGroup::getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const std::vector<double> &near, const std::map<robot_model::JointModel::JointType, double> &distance_map) const
+void moveit::core::JointModelGroup::getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const std::vector<double> &near, const std::map<moveit::core::JointModel::JointType, double> &distance_map) const
 {
   if (near.size() != variable_count_)
   {
@@ -259,11 +262,11 @@ void robot_model::JointModelGroup::getVariableRandomValuesNearBy(random_numbers:
              name_.c_str(), variable_count_, (unsigned int)near.size());
     return;
   }
-
+  
   for (std::size_t i = 0  ; i < joint_model_vector_.size() ; ++i)
   {
     double distance = 0.0;
-    std::map<robot_model::JointModel::JointType, double>::const_iterator iter = distance_map.find(joint_model_vector_[i]->getType());
+    std::map<moveit::core::JointModel::JointType, double>::const_iterator iter = distance_map.find(joint_model_vector_[i]->getType());
     if (iter != distance_map.end())
       distance = iter->second;
     else
@@ -272,7 +275,7 @@ void robot_model::JointModelGroup::getVariableRandomValuesNearBy(random_numbers:
   }
 }
 
-void robot_model::JointModelGroup::getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const std::vector<double> &near, const std::vector<double> &distances) const
+void moveit::core::JointModelGroup::getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const std::vector<double> &near, const std::vector<double> &distances) const
 {
   if (distances.size() != joint_model_vector_.size())
   {
@@ -286,12 +289,12 @@ void robot_model::JointModelGroup::getVariableRandomValuesNearBy(random_numbers:
              name_.c_str(), variable_count_, (unsigned int)near.size());
     return;
   }
-
+  
   for (std::size_t i = 0  ; i < joint_model_vector_.size() ; ++i)
     joint_model_vector_[i]->getVariableRandomValuesNearBy(rng, values, near, distances[i]);
 }
 
-double robot_model::JointModelGroup::getMaximumExtent(void) const
+double moveit::core::JointModelGroup::getMaximumExtent(void) const
 {
   double max_distance = 0.0;
   for (std::size_t j = 0 ; j < joint_model_vector_.size() ; ++j)
@@ -299,7 +302,7 @@ double robot_model::JointModelGroup::getMaximumExtent(void) const
   return max_distance;
 }
 
-void robot_model::JointModelGroup::getKnownDefaultStates(std::vector<std::string> &default_states) const
+void moveit::core::JointModelGroup::getKnownDefaultStates(std::vector<std::string> &default_states) const
 {
   default_states.clear();
   default_states.reserve(default_states_.size());
@@ -307,7 +310,7 @@ void robot_model::JointModelGroup::getKnownDefaultStates(std::vector<std::string
     default_states.push_back(it->first);
 }
 
-bool robot_model::JointModelGroup::getVariableDefaultValues(const std::string &name, std::map<std::string, double> &values) const
+bool moveit::core::JointModelGroup::getVariableDefaultValues(const std::string &name, std::map<std::string, double> &values) const
 {
   std::map<std::string, std::map<std::string, double> >::const_iterator it = default_states_.find(name);
   if (it == default_states_.end())
@@ -316,20 +319,20 @@ bool robot_model::JointModelGroup::getVariableDefaultValues(const std::string &n
   return true;
 }
 
-void robot_model::JointModelGroup::getVariableDefaultValues(std::vector<double> &values) const
+void moveit::core::JointModelGroup::getVariableDefaultValues(std::vector<double> &values) const
 {
   values.reserve(values.size() + joint_model_vector_.size());
   for (std::size_t i = 0  ; i < joint_model_vector_.size() ; ++i)
     joint_model_vector_[i]->getVariableDefaultValues(values);
 }
 
-void robot_model::JointModelGroup::getVariableDefaultValues(std::map<std::string, double> &values) const
+void moveit::core::JointModelGroup::getVariableDefaultValues(std::map<std::string, double> &values) const
 {
   for (std::size_t i = 0  ; i < joint_model_vector_.size() ; ++i)
     joint_model_vector_[i]->getVariableDefaultValues(values);
 }
 
-std::vector<moveit_msgs::JointLimits> robot_model::JointModelGroup::getVariableDefaultLimits() const
+std::vector<moveit_msgs::JointLimits> moveit::core::JointModelGroup::getVariableDefaultLimits() const
 {
   std::vector<moveit_msgs::JointLimits> ret_vec;
   for(unsigned int i = 0; i < joint_model_vector_.size(); i++)
@@ -340,7 +343,7 @@ std::vector<moveit_msgs::JointLimits> robot_model::JointModelGroup::getVariableD
   return ret_vec;
 }
 
-std::vector<moveit_msgs::JointLimits> robot_model::JointModelGroup::getVariableLimits() const
+std::vector<moveit_msgs::JointLimits> moveit::core::JointModelGroup::getVariableLimits() const
 {
   std::vector<moveit_msgs::JointLimits> ret_vec;
   for(unsigned int i = 0; i < joint_model_vector_.size(); i++)
@@ -351,7 +354,7 @@ std::vector<moveit_msgs::JointLimits> robot_model::JointModelGroup::getVariableL
   return ret_vec;
 }
 
-void robot_model::JointModelGroup::setVariableLimits(const std::vector<moveit_msgs::JointLimits>& jlim)
+void moveit::core::JointModelGroup::setVariableLimits(const std::vector<moveit_msgs::JointLimits>& jlim)
 {
   // the following const_cast is safe because we are in a non-const function that operates on the same model
   // the joint is part of
@@ -359,14 +362,14 @@ void robot_model::JointModelGroup::setVariableLimits(const std::vector<moveit_ms
     const_cast<JointModel*>(joint_model_vector_[i])->setVariableLimits(jlim);
 }
 
-void robot_model::JointModelGroup::setDefaultIKTimeout(double ik_timeout)
+void moveit::core::JointModelGroup::setDefaultIKTimeout(double ik_timeout)
 {
   default_ik_timeout_ = ik_timeout;
   if (solver_instance_)
     solver_instance_->setDefaultTimeout(ik_timeout);
 }
 
-void robot_model::JointModelGroup::setSolverAllocators(const std::pair<SolverAllocatorFn, SolverAllocatorMapFn> &solvers)
+void moveit::core::JointModelGroup::setSolverAllocators(const std::pair<SolverAllocatorFn, SolverAllocatorMapFn> &solvers)
 {
   solver_allocators_ = solvers;
   if (solver_allocators_.first)
@@ -385,7 +388,7 @@ void robot_model::JointModelGroup::setSolverAllocators(const std::pair<SolverAll
           solver_instance_.reset();
           return;
         }
-        const robot_model::JointModel *jm = getJointModel(ik_jnames[i]);
+        const moveit::core::JointModel *jm = getJointModel(ik_jnames[i]);
         for (unsigned int k = 0 ; k < jm->getVariableCount() ; ++k)
           ik_joint_bijection_.push_back(it->second + k);
       }
@@ -394,7 +397,7 @@ void robot_model::JointModelGroup::setSolverAllocators(const std::pair<SolverAll
   }
 }
 
-bool robot_model::JointModelGroup::canSetStateFromIK(const std::string &tip) const
+bool moveit::core::JointModelGroup::canSetStateFromIK(const std::string &tip) const
 {
   const kinematics::KinematicsBaseConstPtr& solver = getSolverInstance();
   if (!solver)
@@ -415,7 +418,7 @@ bool robot_model::JointModelGroup::canSetStateFromIK(const std::string &tip) con
     return true;
 }
 
-void robot_model::JointModelGroup::printGroupInfo(std::ostream &out) const
+void moveit::core::JointModelGroup::printGroupInfo(std::ostream &out) const
 {
   out << "Group '" << name_ << "':" << std::endl;
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)

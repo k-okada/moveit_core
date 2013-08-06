@@ -1,7 +1,7 @@
 /*********************************************************************
  * Software License Agreement (BSD License)
  *
- *  Copyright (c) 2012, Willow Garage, Inc.
+ *  Copyright (c) 2013, Willow Garage, Inc.
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -37,9 +37,9 @@
 #ifndef MOVEIT_CORE_ROBOT_MODEL_JOINT_MODEL_
 #define MOVEIT_CORE_ROBOT_MODEL_JOINT_MODEL_
 
-#include <map>
 #include <string>
 #include <vector>
+#include <boost/container/flat_map.hpp>
 #include <moveit_msgs/JointLimits.h>
 #include <random_numbers/random_numbers.h>
 #include <Eigen/Geometry>
@@ -336,53 +336,53 @@ protected:
   void computeVariableBoundsMsg();
   
   /** \brief Name of the joint */
-  std::string                                       name_;
+  std::string                                          name_;
 
   /** \brief The type of joint */
-  JointType                                         type_;
+  JointType                                            type_;
 
   /** \brief The local names to use for the variables that make up this joint */
-  std::vector<std::string>                          local_variable_names_;
+  std::vector<std::string>                             local_variable_names_;
 
   /** \brief The full names to use for the variables that make up this joint */
-  std::vector<std::string>                          variable_names_;
+  std::vector<std::string>                             variable_names_;
 
   /** \brief The bounds for each variable (low, high) in the same order as variable_names_ */
-  Bounds                                            variable_bounds_;
+  Bounds                                               variable_bounds_;
 
-  std::vector<moveit_msgs::JointLimits>             variable_bounds_msg_;
+  std::vector<moveit_msgs::JointLimits>                variable_bounds_msg_;
   
   /** \brief Map from variable names to the corresponding index in variable_names_ (indexing makes sense within the JointModel only) */
-  std::map<std::string, std::size_t>                variable_index_map_;
+  boost::container::flat_map<std::string, std::size_t> variable_index_map_;
 
-  std::vector<std::size_t>                          variable_index_;
+  std::vector<std::size_t>                             variable_index_;
 
   /** \brief The link before this joint */
-  LinkModel                                        *parent_link_model_;
+  LinkModel                                           *parent_link_model_;
 
   /** \brief The link after this joint */
-  LinkModel                                        *child_link_model_;
+  LinkModel                                           *child_link_model_;
 
   /** \brief The joint this one mimics (NULL for joints that do not mimic) */
-  JointModel                                       *mimic_;
+  JointModel                                          *mimic_;
 
   /** \brief The offset to the mimic joint */
-  double                                            mimic_factor_;
+  double                                               mimic_factor_;
 
   /** \brief The multiplier to the mimic joint */
-  double                                            mimic_offset_;
+  double                                               mimic_offset_;
 
   /** \brief The set of joints that should get a value copied to them when this joint changes */
-  std::vector<const JointModel*>                    mimic_requests_;
+  std::vector<const JointModel*>                       mimic_requests_;
 
   /** \brief Specify whether this joint is marked as passive in the SRDF */
-  bool                                              passive_;
+  bool                                                 passive_;
 
   /** \brief The factor applied to the distance between two joint states */
-  double                                            distance_factor_;
+  double                                               distance_factor_;
 
   /** \brief The index assigned to this joint when traversing the kinematic tree in depth first fashion */
-  int                                               tree_index_;
+  int                                                  tree_index_;
 };
 
 }

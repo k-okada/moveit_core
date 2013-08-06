@@ -1,7 +1,7 @@
 /*********************************************************************
 * Software License Agreement (BSD License)
 *
-*  Copyright (c) 2012, Willow Garage, Inc.
+*  Copyright (c) 2013, Willow Garage, Inc.
 *  All rights reserved.
 *
 *  Redistribution and use in source and binary forms, with or without
@@ -34,36 +34,37 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_ROBOT_MODEL_FLOATING_JOINT_MODEL_
-#define MOVEIT_ROBOT_MODEL_FLOATING_JOINT_MODEL_
+#ifndef MOVEIT_CORE_ROBOT_MODEL_FLOATING_JOINT_MODEL_
+#define MOVEIT_CORE_ROBOT_MODEL_FLOATING_JOINT_MODEL_
 
 #include <moveit/robot_model/joint_model.h>
 
-namespace robot_model
+namespace moveit
+{
+namespace core
 {
 
 /** \brief A floating joint */
 class FloatingJointModel : public JointModel
 {
-  friend class RobotModel;
 public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   FloatingJointModel(const std::string& name);
-  virtual void getVariableDefaultValues(std::vector<double> &values, const Bounds &other_bounds) const;
-  virtual void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const Bounds &other_bounds) const;
-  virtual void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values, const Bounds &other_bounds,
-                                             const std::vector<double> &near, const double distance) const;
-  virtual void enforceBounds(std::vector<double> &values, const Bounds &other_bounds) const;
-  virtual bool satisfiesBounds(const std::vector<double> &values, const Bounds &other_bounds, double margin) const;
 
-  virtual double getMaximumExtent(const Bounds &other_bounds) const;
-  virtual double distance(const std::vector<double> &values1, const std::vector<double> &values2) const;
-  virtual void interpolate(const std::vector<double> &from, const std::vector<double> &to, const double t, std::vector<double> &state) const;
+  virtual void getVariableDefaultValues(double *values, const Bounds &other_bounds) const;
+  virtual void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, double *values, const Bounds &other_bounds) const;
+  virtual void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const Bounds &other_bounds,
+                                             const double *near, const double distance) const;
+  virtual void enforceBounds(double *values, const Bounds &other_bounds) const;
+  virtual bool satisfiesBounds(const double *values, const Bounds &other_bounds, double margin) const;
+
+  virtual void interpolate(const double *from, const double *to, const double t, double *state) const;
   virtual unsigned int getStateSpaceDimension() const;
-  virtual void computeTransform(const std::vector<double>& joint_values, Eigen::Affine3d &transf) const;
-  virtual void computeJointStateValues(const Eigen::Affine3d& transf, std::vector<double>& joint_values) const;
-  virtual void updateTransform(const std::vector<double>& joint_values, Eigen::Affine3d &transf) const;
+  virtual double getMaximumExtent(const Bounds &other_bounds) const;
+  virtual double distance(const double *values1, const double *values2) const;
+
+  virtual void computeTransform(const double *joint_values, Eigen::Affine3d &transf) const;
+  virtual void computeJointStateValues(const Eigen::Affine3d& transf, double *joint_values) const;
 
   double getAngularDistanceWeight() const
   {
@@ -77,16 +78,19 @@ public:
 
   /// Normalize the quaternion (warn if norm is 0, and set to identity);
   /// Return true if any change was made
-  bool normalizeRotation(std::vector<double> &values) const;
+  bool normalizeRotation(double *values) const;
 
-  double distanceRotation(const std::vector<double> &values1, const std::vector<double> &values2) const;
+  /// Get the distance between the rotation components of two states
+  double distanceRotation(const double *values1, const double *values2) const;
 
-  double distanceTranslation(const std::vector<double> &values1, const std::vector<double> &values2) const;
+  /// Get the distance between the translation components of two states
+  double distanceTranslation(const double *values1, const double *values2) const;
 
 private:
 
   double angular_distance_weight_;
 };
+}
 }
 
 #endif

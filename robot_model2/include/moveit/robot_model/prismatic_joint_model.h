@@ -1,7 +1,7 @@
 /*********************************************************************
 * Software License Agreement (BSD License)
 *
-*  Copyright (c) 2012, Willow Garage, Inc.
+*  Copyright (c) 2013, Willow Garage, Inc.
 *  All rights reserved.
 *
 *  Redistribution and use in source and binary forms, with or without
@@ -34,12 +34,14 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_ROBOT_MODEL_PRISMATIC_JOINT_MODEL_
-#define MOVEIT_ROBOT_MODEL_PRISMATIC_JOINT_MODEL_
+#ifndef MOVEIT_CORE_ROBOT_MODEL_PRISMATIC_JOINT_MODEL_
+#define MOVEIT_CORE_ROBOT_MODEL_PRISMATIC_JOINT_MODEL_
 
 #include <moveit/robot_model/joint_model.h>
 
-namespace robot_model
+namespace moveit
+{
+namespace core
 {
 
 /** \brief A prismatic joint */
@@ -80,6 +82,7 @@ protected:
   /** \brief The axis of the joint */
   Eigen::Vector3d axis_;
 };
+}
 }
 
 #endif
