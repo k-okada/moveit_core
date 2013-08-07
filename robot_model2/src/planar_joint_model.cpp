@@ -203,7 +203,7 @@ void moveit::core::PlanarJointModel::computeTransform(const double *joint_values
   transf = Eigen::Affine3d(Eigen::Translation3d(joint_values[0], joint_values[1], 0.0) * Eigen::AngleAxisd(joint_values[2], Eigen::Vector3d::UnitZ()));
 }
 
-void moveit::core::PlanarJointModel::computeJointStateValues(const Eigen::Affine3d& transf, double *joint_values) const
+void moveit::core::PlanarJointModel::computeVariableValues(const Eigen::Affine3d& transf, double *joint_values) const
 {
   joint_values[0] = transf.translation().x();
   joint_values[1] = transf.translation().y();

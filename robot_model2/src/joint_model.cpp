@@ -125,3 +125,15 @@ void moveit::core::JointModel::computeVariableBoundsMsg()
     variable_bounds_msg_.push_back(lim);
   }
 }
+
+void moveit::core::JointModel::setMimic(const JointModel *mimic, double factor, double offset)
+{
+  mimic_ = mimic;
+  mimic_factor_ = factor;
+  mimic_offset_ = offset;  
+}
+
+void moveit::core::JointModel::addMimicRequest(const JointModel *joint)
+{
+  mimic_requests_.push_back(joint);
+}

@@ -115,7 +115,7 @@ void moveit::core::PrismaticJointModel::computeTransform(const double *joint_val
   transf.translation() = Eigen::Vector3d(axis_ * joint_values[0]);
 }
 
-void moveit::core::PrismaticJointModel::computeJointStateValues(const Eigen::Affine3d& transf, double *joint_values) const
+void moveit::core::PrismaticJointModel::computeVariableValues(const Eigen::Affine3d& transf, double *joint_values) const
 {
   joint_values[0] = transf.translation().dot(axis_);
 }

@@ -179,7 +179,7 @@ void moveit::core::RevoluteJointModel::computeTransform(const double *joint_valu
   transf = Eigen::Affine3d(Eigen::AngleAxisd(joint_values[0], axis_));
 }
 
-void moveit::core::RevoluteJointModel::computeJointStateValues(const Eigen::Affine3d& transf, double *joint_values) const
+void moveit::core::RevoluteJointModel::computeVariableValues(const Eigen::Affine3d& transf, double *joint_values) const
 {
   Eigen::Quaterniond q(transf.rotation());
   q.normalize();

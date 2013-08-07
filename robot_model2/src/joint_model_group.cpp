@@ -34,7 +34,6 @@
 
 /* Author: Ioan Sucan */
 
-#include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model/joint_model_group.h>
 #include <moveit/robot_model/revolute_joint_model.h>
 #include <moveit/exceptions/exceptions.h>
@@ -116,18 +115,19 @@ bool jointPrecedes(const JointModel *a, const JointModel *b)
 }
 
 moveit::core::JointModelGroup::JointModelGroup(const std::string& group_name,
-                                               const std::vector<JointModel*> &unsorted_group_joints,
+                                               const srdf::Model::Group &config,
+                                               const std::vector<const JointModel*> &unsorted_group_joints,
                                                const RobotModel* parent_model)
   : parent_model_(parent_model)
   , name_(group_name)
   , variable_count_(0)
-  , is_end_effector_(false)
   , is_chain_(false)
   , default_ik_timeout_(0.5)
   , default_ik_attempts_(2)
+  , config_(config)
 {
   // sort joints in Depth-First order
-  std::vector<JointModel*> group_joints = unsorted_group_joints;
+  std::vector<const JointModel*> group_joints = unsorted_group_joints;
   std::sort(group_joints.begin(), group_joints.end(), OrderJointsByIndex());
   
   for (std::size_t i = 0 ; i < group_joints.size() ; ++i)
@@ -139,7 +139,6 @@ moveit::core::JointModelGroup::JointModelGroup(const std::string& group_name,
       if (group_joints[i]->getMimic() == NULL)
       {
         joint_model_vector_.push_back(group_joints[i]);
-        joint_model_vector_const_.push_back(group_joints[i]);
         joint_model_index_start_.push_back(variable_count_);
         variable_count_ += vc;
       }
@@ -148,7 +147,7 @@ moveit::core::JointModelGroup::JointModelGroup(const std::string& group_name,
       
       if (group_joints[i]->getType() == JointModel::REVOLUTE && 
           static_cast<const RevoluteJointModel*>(group_joints[i])->isContinuous())
-        continuous_joint_model_vector_const_.push_back(group_joints[i]);
+        continuous_joint_model_vector_.push_back(group_joints[i]);
     }
     else
       fixed_joints_.push_back(group_joints[i]);
@@ -237,7 +236,7 @@ moveit::core::JointModelGroup::JointModelGroup(const std::string& group_name,
         break;
       }
     if (chain)
-      is_chain_ = true;
+      markAsChain();
   }
   computeVariableBoundsMsg();
 }
@@ -262,6 +261,14 @@ bool moveit::core::JointModelGroup::hasJointModel(const std::string &joint) cons
 bool moveit::core::JointModelGroup::hasLinkModel(const std::string &link) const
 {
   return link_model_map_.find(link) != link_model_map_.end();
+}
+
+const moveit::core::LinkModel* moveit::core::JointModelGroup::getLinkModel(const std::string &name) const
+{
+  boost::container::flat_map<std::string, const LinkModel*>::const_iterator it = link_model_map_.find(name);
+  if (it == link_model_map_.end())
+    throw Exception("Link '" + name + "' not found in group '" + name_ + "'");
+  return it->second;
 }
 
 const moveit::core::JointModel* moveit::core::JointModelGroup::getJointModel(const std::string &name) const
@@ -355,10 +362,31 @@ void moveit::core::JointModelGroup::computeVariableBoundsMsg()
   }
 }
 
+void moveit::core::JointModelGroup::markAsChain()
+{
+  is_chain_ = true;
+}
+
+void moveit::core::JointModelGroup::setEndEffectorName(const std::string &name)
+{
+  end_effector_name_ = name;
+}
+
+void moveit::core::JointModelGroup::setEndEffectorParent(const std::string &group, const std::string &link)
+{
+  end_effector_parent_.first = group;
+  end_effector_parent_.second = link;
+}
+
+void moveit::core::JointModelGroup::attachEndEffector(const std::string &eef_name)
+{
+  attached_end_effector_names_.push_back(eef_name);
+}
+
 void moveit::core::JointModelGroup::setVariableBounds(const std::vector<moveit_msgs::JointLimits>& jlim)
 {
   for (std::size_t i = 0; i < joint_model_vector_.size(); ++i)
-    joint_model_vector_[i]->setVariableBounds(jlim);
+    const_cast<JointModel*>(joint_model_vector_[i])->setVariableBounds(jlim);
   computeVariableBoundsMsg();
 }
 
@@ -400,18 +428,26 @@ void moveit::core::JointModelGroup::setSolverAllocators(const std::pair<SolverAl
 bool moveit::core::JointModelGroup::canSetStateFromIK(const std::string &tip) const
 {
   const kinematics::KinematicsBaseConstPtr& solver = getSolverInstance();
-  if (!solver)
+  if (!solver || tip.empty())
     return false;
   const std::string &tip_frame = solver->getTipFrame();
-  if (tip != tip_frame)
+  if (tip_frame.empty())
+    return false;
+  
+  // remove frame reference, if specified
+  const std::string &tip_local = tip[0] == '/' ? tip.substr(1) : tip;
+  const std::string &tip_frame_local = tip_frame[0] == '/' ? tip_frame.substr(1) : tip_frame;
+
+  if (tip_local != tip_frame_local)
   {
-    const LinkModel *lm = getParentModel()->getLinkModel(tip);
-    if (!lm)
-      return false;
-    const LinkModel::AssociatedFixedTransformMap &fixed_links = lm->getAssociatedFixedTransforms();
-    for (LinkModel::AssociatedFixedTransformMap::const_iterator it = fixed_links.begin() ; it != fixed_links.end() ; ++it)
-      if (it->first->getName() == tip_frame)
-        return true;
+    if (hasLinkModel(tip_frame_local))
+    {
+      const LinkModel *lm = getLinkModel(tip_frame_local);
+      const LinkModel::AssociatedFixedTransformMap &fixed_links = lm->getAssociatedFixedTransforms();
+      for (LinkModel::AssociatedFixedTransformMap::const_iterator it = fixed_links.begin() ; it != fixed_links.end() ; ++it)
+        if (it->first->getName() == tip_local)
+          return true;
+    }
     return false;
   }
   else

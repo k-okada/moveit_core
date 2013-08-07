@@ -87,6 +87,6 @@ void moveit::core::FixedJointModel::computeTransform(const double */* joint_valu
   transf.setIdentity();
 }
 
-void moveit::core::FixedJointModel::computeJointStateValues(const Eigen::Affine3d& /* transform */, double * /* joint_values */) const
+void moveit::core::FixedJointModel::computeVariableValues(const Eigen::Affine3d& /* transform */, double * /* joint_values */) const
 {
 }

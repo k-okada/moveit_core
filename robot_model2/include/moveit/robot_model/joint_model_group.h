@@ -40,6 +40,7 @@
 #include <moveit/robot_model/joint_model.h>
 #include <moveit/robot_model/link_model.h>
 #include <moveit/kinematics_base/kinematics_base.h>
+#include <srdfdom/model.h>
 #include <boost/container/flat_set.hpp>
 #include <boost/function.hpp>
 #include <set>
@@ -52,17 +53,21 @@ namespace core
 class RobotModel;
 class JointModelGroup;
 
-/// function type that allocates a kinematics solver for a particular group
+/// Function type that allocates a kinematics solver for a particular group
 typedef boost::function<kinematics::KinematicsBasePtr(const JointModelGroup*)> SolverAllocatorFn;
 
-/// function type that allocates a kinematics solvers for subgroups of a group
+/// Map from group instances to allocator functions
 typedef std::map<const JointModelGroup*, SolverAllocatorFn> SolverAllocatorMapFn;
+
+/// Map of names to instances for JointModelGroup
+typedef boost::container::flat_map<std::string, JointModelGroup*> JointModelGroupMap;
 
 class JointModelGroup
 {
 public:
 
-  JointModelGroup(const std::string& name, const std::vector<JointModel*>& joint_vector, const RobotModel *parent_model);
+  JointModelGroup(const std::string& name, const srdf::Model::Group &config,
+                  const std::vector<const JointModel*>& joint_vector, const RobotModel *parent_model);
 
   ~JointModelGroup();
 
@@ -78,23 +83,29 @@ public:
     return name_;
   }
 
+  /** \brief get the SRDF configuration this group is based on */
+  const srdf::Model::Group& getConfig() const
+  {
+    return config_;
+  }
+  
   /** \brief Check if a joint is part of this group */
   bool hasJointModel(const std::string &joint) const;
 
   /** \brief Check if a link is part of this group */
   bool hasLinkModel(const std::string &link) const;
 
-  /** \brief Get a joint by its name. Return NULL if the joint is not part of this group. */
+  /** \brief Get a joint by its name. Throw an exception if the joint is not part of this group. */
   const JointModel* getJointModel(const std::string &joint) const;
 
-  /** \brief Get a joint by its name. Return NULL if the joint is not part of this group. */
-  const LinkModel* getLinkModel(const std::string &joint) const;
+  /** \brief Get a joint by its name. Throw an exception if the joint is not part of this group. */
+  const LinkModel* getLinkModel(const std::string &link) const;
 
   /** \brief Get the active joints in this group (that  have controllable DOF).
       This may not be the complete set of joints (see getFixedJointModels() and getMimicJointModels() ) */
   const std::vector<const JointModel*>& getJointModels() const
   {
-    return joint_model_vector_const_;
+    return joint_model_vector_;
   }
 
   /** \brief Get the names of the active joints in this group. These are the names of the joints returned by getJointModels(). */
@@ -118,7 +129,7 @@ public:
   /** \brief Get the array of continuous joints used in thir group. */
   const std::vector<const JointModel*>& getContinuousJointModels() const
   {
-    return continuous_joint_model_vector_const_;
+    return continuous_joint_model_vector_;
   }
 
   /** \brief Get the names of the variables that make up the joints included in this group. Only active joints (not
@@ -316,7 +327,7 @@ public:
   /** \brief Check if this group was designated as an end-effector in the SRDF */
   bool isEndEffector() const
   {
-    return is_end_effector_;
+    return !end_effector_name_.empty();
   }
 
   /** \brief Return the name of the end effector, if this group is an end-effector */
@@ -325,6 +336,15 @@ public:
     return end_effector_name_;
   }
 
+  /** \brief Set the name of the end-effector, and remember this group is indeed an end-effector. */
+  void setEndEffectorName(const std::string &name);
+  
+  /** \brief If this group is an end-effector, specify the parent group (e.g., the arm holding the eef) and the link the end effector connects to */
+  void setEndEffectorParent(const std::string &group, const std::string &link);
+  
+  /** \brief Notify this group that there is an end-effector attached to it */
+  void attachEndEffector(const std::string &eef_name);
+  
   /** \brief Get the name of the group this end-effector attaches to (first) and the name of the link in that group (second) */
   const std::pair<std::string, std::string>& getEndEffectorParentGroup() const
   {
@@ -336,7 +356,10 @@ public:
   {
     return attached_end_effector_names_;
   }
-
+  
+  /** \brief Remember this group is a chain */
+  void markAsChain();
+  
   /** \brief Get the extent of the state space (the maximum value distance() can ever report for this group) */
   double getMaximumExtent(void) const;
 
@@ -424,10 +447,7 @@ protected:
   std::vector<std::string>                              joint_model_name_vector_;
 
   /** \brief Joint instances in the order they appear in the group state */
-  std::vector<JointModel*>                              joint_model_vector_;
-
-  /** \brief Joint instances in the order they appear in the group state */
-  std::vector<const JointModel*>                        joint_model_vector_const_;
+  std::vector<const JointModel*>                        joint_model_vector_;
 
   /** \brief A map from joint names to their instances */
   boost::container::flat_map<std::string, const JointModel*> joint_model_map_;
@@ -447,7 +467,7 @@ protected:
   std::vector<const JointModel*>                        mimic_joints_;
 
   /** \brief The set of continuous joints this group contains */
-  std::vector<const JointModel*>                        continuous_joint_model_vector_const_;
+  std::vector<const JointModel*>                        continuous_joint_model_vector_;
 
   /** \brief The names of the DOF that make up this group (this is just a sequence of joint variable names; not necessarily joint names!) */
   std::vector<std::string>                              active_variable_names_;
@@ -509,9 +529,6 @@ protected:
   /** \brief The set of labelled subgroups that are included in this group */
   boost::container::flat_set<std::string>               subgroup_names_set_;
   
-  /** \brief Flag indicating whether this group is an end effector */
-  bool                                                  is_end_effector_;
-
   /** \brief If an end-effector is attached to this group, the name of that end-effector is stored in this variable */
   std::vector<std::string>                              attached_end_effector_names_;
 
@@ -535,6 +552,8 @@ protected:
 
   unsigned int                                          default_ik_attempts_;
 
+  srdf::Model::Group                                    config_;
+  
   /** \brief The set of default states specified for this group in the SRDF */
   std::map<std::string, std::map<std::string, double> > default_states_;
 

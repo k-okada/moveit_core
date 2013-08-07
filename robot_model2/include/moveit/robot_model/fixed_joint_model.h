@@ -63,7 +63,7 @@ public:
   virtual double distance(const double *values1, const double *values2) const;
 
   virtual void computeTransform(const double *joint_values, Eigen::Affine3d &transf) const;
-  virtual void computeJointStateValues(const Eigen::Affine3d& transf, double *joint_values) const;
+  virtual void computeVariableValues(const Eigen::Affine3d& transf, double *joint_values) const;
 
 };
 }

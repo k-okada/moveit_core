@@ -79,8 +79,13 @@ struct VariableBounds
 
 /** \brief Data type for holding mappings from variable names to their position in a state vector */
 typedef boost::container::flat_map<std::string, std::size_t> VariableIndexMap;
+typedef boost::container::flat_map<std::string, VariableBounds> VariableBoundsMap;
 
 class LinkModel;
+class JointModel;
+
+/// Map of names to instances for JointModel
+typedef boost::container::flat_map<std::string, JointModel*> JointModelMap;
 
 /** \brief A joint from the robot. Models the transform that
     this joint applies in the kinematic chain. A joint
@@ -148,6 +153,21 @@ public:
     return child_link_model_;
   }
 
+  void setParentLinkModel(const LinkModel *link)
+  {
+    parent_link_model_ = link;
+  }
+
+  void setChildLinkModel(const LinkModel *link)
+  {
+    child_link_model_ = link;
+  }
+  
+  void setTreeIndex(int index)
+  {
+    tree_index_ = index;
+  }
+  
   /** @name Reason about the variables that make up this joint
       @{ */
 
@@ -298,12 +318,18 @@ public:
     return mimic_factor_;
   }
 
+  /** \brief Mark this joint as mimicking \e mimic using \e factor and \e offset */
+  void setMimic(const JointModel *mimic, double factor, double offset);
+  
   /** \brief The joint models whose values would be modified if the value of this joint changed */
   const std::vector<const JointModel*>& getMimicRequests() const
   {
     return mimic_requests_;
   }
 
+  /** \brief Notify this joint that there is another joint that mimics it */
+  void addMimicRequest(const JointModel *joint);
+  
   /** \brief Get all the link models that descend from this joint, in the kinematic tree */
   const std::vector<const LinkModel*>& getDescendantLinkModels() const
   {
@@ -315,7 +341,12 @@ public:
   {
     return passive_;
   }
-
+  
+  void setPassive(bool flag)
+  {
+    passive_ = flag;
+  }
+  
   /** \brief Computes the state that lies at time @e t in [0, 1] on the segment that connects @e from state to @e to state.
       The memory location of @e state is not required to be different from the memory of either
       @e from or @e to. */
@@ -367,13 +398,13 @@ protected:
   std::vector<std::size_t>                             variable_index_;
 
   /** \brief The link before this joint */
-  LinkModel                                           *parent_link_model_;
+  const LinkModel                                     *parent_link_model_;
 
   /** \brief The link after this joint */
-  LinkModel                                           *child_link_model_;
+  const LinkModel                                     *child_link_model_;
 
   /** \brief The joint this one mimics (NULL for joints that do not mimic) */
-  JointModel                                          *mimic_;
+  const JointModel                                    *mimic_;
 
   /** \brief The offset to the mimic joint */
   double                                               mimic_factor_;

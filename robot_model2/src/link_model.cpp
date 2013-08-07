@@ -36,7 +36,10 @@
 
 #include <moveit/robot_model/link_model.h>
 
-moveit::core::LinkModel::LinkModel() : parent_joint_model_(NULL), tree_index_(-1)
+moveit::core::LinkModel::LinkModel(const std::string &name) 
+  : name_(name)
+  , parent_joint_model_(NULL)
+  , tree_index_(-1)
 {
   joint_origin_transform_.setIdentity();
   //  collision_origin_transform_.setIdentity();

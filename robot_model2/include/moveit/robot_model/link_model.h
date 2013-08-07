@@ -53,6 +53,10 @@ namespace core
 {
 
 class JointModel;
+class LinkModel;
+
+/// Map of names to instances for LinkModel
+typedef boost::container::flat_map<std::string, LinkModel*> LinkModelMap;
 
 /** \brief A link from the robot. Contains the constant transform applied to the link and its geometry */
 class LinkModel
@@ -64,7 +68,7 @@ public:
   typedef boost::container::flat_map<const LinkModel*, Eigen::Affine3d, std::less<const LinkModel*>,
                                      Eigen::aligned_allocator<std::pair<const LinkModel*, Eigen::Affine3d> > > AssociatedFixedTransformMap;
 
-  LinkModel();
+  LinkModel(const std::string &name);
   ~LinkModel();
 
   /** \brief The name of this link */
@@ -79,18 +83,33 @@ public:
     return tree_index_;
   }
 
+  void setTreeIndex(int index)
+  {
+    tree_index_ = index;
+  }
+  
   /** \brief Get the joint model whose child this link is. There will always be a parent joint */
   const JointModel* getParentJointModel() const
   {
     return parent_joint_model_;
   }
 
+  void setParentJointModel(const JointModel *joint)
+  {
+    parent_joint_model_ = joint;
+  }
+  
   /** \brief A link may have 0 or more child joints. From those joints there will certainly be other descendant links */
   const std::vector<const JointModel*>& getChildJointModels() const
   {
     return child_joint_models_;
   }
 
+  void addChildJointModel(const JointModel *joint)
+  {
+    child_joint_models_.push_back(joint);
+  }
+  
   /** \brief When transforms are computed for this link,
       they are usually applied to the link's origin. The
       joint origin transform acts as an offset -- it is
@@ -133,6 +152,12 @@ public:
     return associated_fixed_transforms_;
   }
 
+  /** \brief Remember that \e link_model is attached to this link using a fixed transform */
+  void addAssociatedFixedTransform(const LinkModel *link_model, const Eigen::Affine3d &transform)
+  {
+    associated_fixed_transforms_[link_model] = transform;
+  }
+  
   /** \brief Get the filename of the mesh resource used for visual display of this link */
   const std::string& getVisualMeshFilename() const
   {

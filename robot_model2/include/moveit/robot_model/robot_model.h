@@ -123,7 +123,7 @@ public:
   /** \brief Return the name of the root joint. Throws an exception if there is no root joint. */
   const std::string& getRootJointName() const
   {
-    return getRoot()->getName();
+    return getRootJoint()->getName();
   }  
   
   /** \brief Check if a joint exists. Return true if it does. */
@@ -131,6 +131,9 @@ public:
   
   /** \brief Get a joint by its name. Throw an exception when the joint is missing. */
   const JointModel* getJointModel(const std::string &joint) const;
+
+  /** \brief Get a joint by its name. Throw an exception when the joint is missing. */
+  JointModel* getJointModel(const std::string &joint);
   
   /** \brief Get the array of joints, in the order they appear
       in the robot state. */
@@ -156,7 +159,7 @@ public:
       in the robot state. */
   const std::vector<const JointModel*>& getContinuousJointModels() const
   {
-    return continuous_joint_model_vector_const_;
+    return continuous_joint_model_vector_;
   }
 
   /** @} */
@@ -179,6 +182,9 @@ public:
 
   /** \brief Get a link by its name. Throw an exception when the link is missing. */
   const LinkModel* getLinkModel(const std::string &link) const;
+
+  /** \brief Get a link by its name. Throw an exception when the link is missing. */
+  LinkModel* getLinkModel(const std::string &link);
 
   /** \brief Get the array of links  */
   const std::vector<const LinkModel*>& getLinkModels() const
@@ -283,7 +289,7 @@ public:
   }
 
   /** \brief Get bounds for all the variables in this model. Bounds are returned as a std::pair<lower,upper> */
-  const std::map<std::string, std::pair<double, double> >& getAllVariableBounds() const
+  const VariableBoundsMap& getAllVariableBounds() const
   {
     return variable_bounds_;
   }
@@ -292,7 +298,7 @@ public:
       The state includes all the joint variables that make up the joints the state consists of.
       This map gives the position in the state vector of the group for each of these variables.
       Additionaly, it includes the names of the joints and the index for the first variable of that joint.*/
-  const std::map<std::string, unsigned int>& getJointVariablesIndexMap() const
+  const VariableIndexMap& getJointVariablesIndexMap() const
   {
     return joint_variables_index_map_;
   }
@@ -339,11 +345,8 @@ protected:
   /** \brief Get the set of link names that follow a parent link in the kinematic chain */
   //  std::vector<std::string> getChildLinkModelNames(const JointModel* parent) const;
 
-
-  typedef std::map<LinkModel*, Eigen::Affine3d, std::less<LinkModel*>,
-                   Eigen::aligned_allocator<std::pair<const LinkModel*, Eigen::Affine3d> > > LinkModelToAffine3dMap;
-
-  void computeFixedTransforms(LinkModel *link, const Eigen::Affine3d &transform, LinkModelToAffine3dMap &associated_transforms);
+  void computeFixedTransforms(const LinkModel *link, const Eigen::Affine3d &transform, 
+                              LinkModel::AssociatedFixedTransformMap &associated_transforms);
 
   // GENERIC INFO
   
@@ -361,10 +364,10 @@ protected:
   // LINKS
 
   /** \brief The first physical link for the robot */
-  LinkModel                                    *root_link_;
+  const LinkModel                              *root_link_;
 
   /** \brief A map from link names to their instances */
-  std::map<std::string, LinkModel*>             link_model_map_;
+  LinkModelMap                                  link_model_map_;
 
   /** \brief The vector of links that are updated when computeTransforms() is called, in the order they are updated */
   std::vector<LinkModel*>                       link_model_vector_;
@@ -376,7 +379,7 @@ protected:
   std::vector<std::string>                      link_model_names_vector_;
 
   /** \brief Only links that have collision geometry specified */
-  std::vector<LinkModel*>                       link_models_with_collision_geometry_vector_;
+  std::vector<const LinkModel*>                 link_models_with_collision_geometry_vector_;
 
   /** \brief The vector of link names that corresponds to link_models_with_collision_geometry_vector_ */
   std::vector<std::string>                      link_model_names_with_collision_geometry_vector_;
@@ -385,10 +388,10 @@ protected:
   // JOINTS
 
   /** \brief The root joint */
-  JointModel                                   *root_joint_;
+  const JointModel                             *root_joint_;
 
   /** \brief A map from joint names to their instances */
-  std::map<std::string, JointModel*>            joint_model_map_;
+  JointModelMap                                 joint_model_map_;
 
   /** \brief The vector of joints in the model, in the order they appear in the state vector */
   std::vector<JointModel*>                      joint_model_vector_;
@@ -400,7 +403,7 @@ protected:
   std::vector<std::string>                      joint_model_names_vector_;
 
   /** \brief The set of continuous joints this model contains */
-  std::vector<const JointModel*>                continuous_joint_model_vector_const_;
+  std::vector<const JointModel*>                continuous_joint_model_vector_;
 
 
   // INDEXING
@@ -414,30 +417,32 @@ protected:
   /** \brief The state includes all the joint variables that make up the joints the state consists of.
       This map gives the position in the state vector of the group for each of these variables.
       Additionaly, it includes the names of the joints and the index for the first variable of that joint. */
-  std::map<std::string, unsigned int>           joint_variables_index_map_;
+  VariableIndexMap                              joint_variables_index_map_;
 
   /** \brief The bounds for all the variables that make up the joints in this model */
-  std::map<std::string,
-           std::pair<double, double> >          variable_bounds_;
-
+  VariableBoundsMap                             variable_bounds_;
 
 
   // GROUPS
 
   /** \brief A map from group names to joint groups */
-  std::map<std::string, JointModelGroup*>       joint_model_group_map_;
-
-  /** \brief A vector of all group names */
-  std::vector<std::string>                      joint_model_group_names_;
-
-  /** \brief A map of all group names */
-  std::map<std::string, srdf::Model::Group>     joint_model_group_config_map_;
+  JointModelGroupMap                            joint_model_group_map_;
 
   /** \brief The known end effectors */
-  std::map<std::string, JointModelGroup*>       end_effectors_;
+  JointModelGroupMap                            end_effectors_map_;
 
+  /** \brief The array of joint model groups, in alphabetical order */
+  std::vector<JointModelGroup*>                 joint_model_groups_;
+  
+  /** \brief The array of joint model groups, in alphabetical order */
+  std::vector<const JointModelGroup*>           joint_model_groups_const_;
+  
+  /** \brief A vector of all group names, in alphabetical order */
+  std::vector<std::string>                      joint_model_group_names_;
 
-
+  /** \brief The array of end-effectors, in alphabetical order */
+  std::vector<const JointModelGroup*>           end_effectors_;
+  
   /** \brief Given an URDF model and a SRDF model, build a full kinematic model */
   void buildModel(const urdf::ModelInterface &urdf_model, const srdf::Model &srdf_model);
 
