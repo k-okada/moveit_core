@@ -137,7 +137,8 @@ void moveit::core::RobotModel::buildJointInfo()
   // construct additional maps for easy access by name
   variable_count_ = 0;
   variable_bounds_.clear();
-
+  joint_model_start_index_.resize(joint_model_vector_.size(), -1);
+  
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
   {
     const std::vector<std::string> &name_order = joint_model_vector_[i]->getVariableNames();
@@ -154,6 +155,7 @@ void moveit::core::RobotModel::buildJointInfo()
           joint_variables_index_map_[name_order[j]] = variable_count_ + j;
           active_variable_names_.push_back(name_order[j]);
         }
+        joint_model_start_index_[i] = variable_count_;
         joint_variables_index_map_[joint_model_vector_[i]->getName()] = variable_count_;
 
         // compute variable count
@@ -793,37 +795,40 @@ moveit::core::LinkModel* moveit::core::RobotModel::constructLinkModel(const urdf
 {
   LinkModel *result = new LinkModel(urdf_link->name);
 
-  if (urdf_link->collision && urdf_link->collision->geometry)
-  {
-    result->collision_origin_transform_ = urdfPose2Affine3d(urdf_link->collision->origin);
-    result->shape_ = constructShape(urdf_link->collision->geometry.get());
-    if (result->shape_)
+  const std::vector<boost::shared_ptr<urdf::Collision> > &col_array = urdf_link->collision_array.empty() ? 
+    std::vector<boost::shared_ptr<urdf::Collision> >(1, urdf_link->collision) : urdf_link->collision_array;
+  
+  std::vector<shapes::ShapeConstPtr> shapes;
+  EigenSTL::vector_Affine3d poses;
+  
+  for (std::size_t i = 0 ; i < col_array.size() ; ++i)
+    if (col_array[i] && col_array[i]->geometry)
     {
-      if (shapes::constructMsgFromShape(result->shape_.get(), result->shape_msg_))
-        result->shape_extents_ = shapes::computeShapeExtents(result->shape_msg_);
-      else
-        result->shape_extents_ = Eigen::Vector3d(0.0, 0.0, 0.0);
+      shapes::ShapeConstPtr s = constructShape(col_array[i]->geometry.get());
+      if (s)
+      {
+        shapes.push_back(s);
+        poses.push_back(urdfPose2Affine3d(col_array[i]->origin));
+      }
     }
-  }
-  else if (urdf_link->visual && urdf_link->visual->geometry)
+  if (shapes.empty())
   {
-    result->collision_origin_transform_ = urdfPose2Affine3d(urdf_link->visual->origin);
-    result->shape_ = constructShape(urdf_link->visual->geometry.get());
-    if (result->shape_)
-    {
-      if (shapes::constructMsgFromShape(result->shape_.get(), result->shape_msg_))
-        result->shape_extents_ = shapes::computeShapeExtents(result->shape_msg_);
-      else
-        result->shape_extents_ = Eigen::Vector3d(0.0, 0.0, 0.0);
-    }
+    const std::vector<boost::shared_ptr<urdf::Visual> > &vis_array = urdf_link->visual_array.empty() ? 
+      std::vector<boost::shared_ptr<urdf::Visual> >(1, urdf_link->visual) : urdf_link->visual_array;
+    for (std::size_t i = 0 ; i < vis_array.size() ; ++i)
+      if (vis_array[i] && vis_array[i]->geometry)
+      {
+        shapes::ShapeConstPtr s = constructShape(vis_array[i]->geometry.get());
+        if (s)
+        {
+          shapes.push_back(s);
+          poses.push_back(urdfPose2Affine3d(vis_array[i]->origin));
+        }
+      }
   }
-  else
-  {
-    result->collision_origin_transform_.setIdentity();
-    result->shape_.reset();
-    result->shape_extents_ = Eigen::Vector3d(0.0, 0.0, 0.0);
-  }
-
+  
+  result->setGeometry(shapes, poses);
+  
   // figure out visual mesh (try visual urdf tag first, collision tag otherwise
   if (urdf_link->visual && urdf_link->visual->geometry)
   {
@@ -831,10 +836,7 @@ moveit::core::LinkModel* moveit::core::RobotModel::constructLinkModel(const urdf
     {
       const urdf::Mesh *mesh = static_cast<const urdf::Mesh*>(urdf_link->visual->geometry.get());
       if (!mesh->filename.empty())
-      {
-        result->visual_mesh_filename_ = mesh->filename;
-        result->visual_mesh_scale_ = Eigen::Vector3d(mesh->scale.x, mesh->scale.y, mesh->scale.z);
-      }
+        result->setVisualMesh(mesh->filename, Eigen::Vector3d(mesh->scale.x, mesh->scale.y, mesh->scale.z));
     }
   }
   else
@@ -844,18 +846,13 @@ moveit::core::LinkModel* moveit::core::RobotModel::constructLinkModel(const urdf
       {
         const urdf::Mesh *mesh = static_cast<const urdf::Mesh*>(urdf_link->collision->geometry.get());
         if (!mesh->filename.empty())
-        {
-          result->visual_mesh_filename_ = mesh->filename;
-          result->visual_mesh_scale_ = Eigen::Vector3d(mesh->scale.x, mesh->scale.y, mesh->scale.z);
-        }
+          result->setVisualMesh(mesh->filename, Eigen::Vector3d(mesh->scale.x, mesh->scale.y, mesh->scale.z));
       }
     }
-
+  
   if (urdf_link->parent_joint)
-    result->joint_origin_transform_ = urdfPose2Affine3d(urdf_link->parent_joint->parent_to_joint_origin_transform);
-  else
-    result->joint_origin_transform_.setIdentity();
-
+    result->setJointOriginTransform(urdfPose2Affine3d(urdf_link->parent_joint->parent_to_joint_origin_transform));
+  
   return result;
 }
 
@@ -910,36 +907,37 @@ bool moveit::core::RobotModel::hasLinkModel(const std::string &name) const
 
 const moveit::core::JointModel* moveit::core::RobotModel::getJointModel(const std::string &name) const
 {
-  std::map<std::string, JointModel*>::const_iterator it = joint_model_map_.find(name);
+  JointModelMap::const_iterator it = joint_model_map_.find(name);
   if (it != joint_model_map_.end())
     return it->second;
-  throw Exception("Joint '" + name + "' not found in model '" + model_name + "'");
+  throw Exception("Joint '" + name + "' not found in model '" + model_name_ + "'");
 }
 
 moveit::core::JointModel* moveit::core::RobotModel::getJointModel(const std::string &name)
 {
-  std::map<std::string, JointModel*>::const_iterator it = joint_model_map_.find(name);
+  JointModelMap::const_iterator it = joint_model_map_.find(name);
   if (it != joint_model_map_.end())
     return it->second;
-  throw Exception("Joint '" + name + "' not found in model '" + model_name + "'");
+  throw Exception("Joint '" + name + "' not found in model '" + model_name_ + "'");
 }
 
 const moveit::core::LinkModel* moveit::core::RobotModel::getLinkModel(const std::string &name) const
 {
-  std::map<std::string, LinkModel*>::const_iterator it = link_model_map_.find(name);
+  LinkModelMap::const_iterator it = link_model_map_.find(name);
   if (it != link_model_map_.end())
     return it->second;
-  throw Exception("Link '" + name + "' not found in model '" + model_name + "'");
+  throw Exception("Link '" + name + "' not found in model '" + model_name_ + "'");
 }
 
 moveit::core::LinkModel* moveit::core::RobotModel::getLinkModel(const std::string &name)
 {
-  std::map<std::string, LinkModel*>::const_iterator it = link_model_map_.find(name);
+  LinkModelMap::const_iterator it = link_model_map_.find(name);
   if (it != link_model_map_.end())
     return it->second;
-  throw Exception("Link '" + name + "' not found in model '" + model_name + "'");
+  throw Exception("Link '" + name + "' not found in model '" + model_name_ + "'");
 }
 
+/*
 void moveit::core::RobotModel::getChildLinkModels(const LinkModel *parent, std::vector<const LinkModel*> &links) const
 {
   links.clear();
@@ -1041,38 +1039,43 @@ std::vector<std::string> moveit::core::RobotModel::getChildJointModelNames(const
   return ret_vec;
 }
 
+*/
 
-void moveit::core::RobotModel::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values) const
+void moveit::core::RobotModel::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, double *values) const
 {
-  for (std::size_t i = 0  ; i < joint_model_vector_.size() ; ++i)
-    if (joint_model_vector_[i]->mimic_ == NULL)
-      joint_model_vector_[i]->getVariableRandomValues(rng, values);
+  for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
+    if (joint_model_start_index_[i] >= 0)
+      joint_model_vector_[i]->getVariableRandomValues(rng, values + joint_model_start_index_[i]);
 }
 
 void moveit::core::RobotModel::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::map<std::string, double> &values) const
 {
-  for (std::size_t i = 0  ; i < joint_model_vector_.size() ; ++i)
-    if (joint_model_vector_[i]->mimic_ == NULL)
-      joint_model_vector_[i]->getVariableRandomValues(rng, values);
+  std::vector<double> tmp(variable_count_);
+  getVariableRandomValues(rng, &tmp[0]);
+  values.clear();
+  for (std::size_t i = 0 ; i < active_variable_names_.size() ; ++i)
+    values[active_variable_names_[i]] = tmp[i];
 }
 
-void moveit::core::RobotModel::getVariableDefaultValues(std::vector<double> &values) const
+void moveit::core::RobotModel::getVariableDefaultValues(double *values) const
 {
-  for (std::size_t i = 0  ; i < joint_model_vector_.size() ; ++i)
-    if (joint_model_vector_[i]->mimic_ == NULL)
-      joint_model_vector_[i]->getVariableDefaultValues(values);
+  for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
+    if (joint_model_start_index_[i] >= 0)
+      joint_model_vector_[i]->getVariableDefaultValues(values + joint_model_start_index_[i]);
 }
 
 void moveit::core::RobotModel::getVariableDefaultValues(std::map<std::string, double> &values) const
 {
-  for (std::size_t i = 0  ; i < joint_model_vector_.size() ; ++i)
-    if (joint_model_vector_[i]->mimic_ == NULL)
-      joint_model_vector_[i]->getVariableDefaultValues(values);
+  std::vector<double> tmp(variable_count_);
+  getVariableDefaultValues(&tmp[0]);
+  values.clear();
+  for (std::size_t i = 0 ; i < active_variable_names_.size() ; ++i)
+    values[active_variable_names_[i]] = tmp[i];
 }
 
 void moveit::core::RobotModel::setKinematicsAllocators(const std::map<std::string, SolverAllocatorFn> &allocators)
 {
-  for (std::map<std::string, JointModelGroup*>::const_iterator it = joint_model_group_map_.begin() ; it != joint_model_group_map_.end() ; ++it)
+  for (JointModelGroupMap::const_iterator it = joint_model_group_map_.begin() ; it != joint_model_group_map_.end() ; ++it)
   {
     JointModelGroup *jmg = it->second;
     std::pair<SolverAllocatorFn, SolverAllocatorMapFn> result;
@@ -1141,21 +1144,20 @@ void moveit::core::RobotModel::printModelInfo(std::ostream &out) const
     for (std::vector<std::string>::const_iterator it = vn.begin() ; it != vn.end() ; ++it)
     {
       out << "   " << *it << " [";
-      std::pair<double, double> b;
-      joint_model_vector_[i]->getVariableBounds(*it, b);
-      if (b.first <= -std::numeric_limits<double>::max())
+      const VariableBounds &b = joint_model_vector_[i]->getVariableBounds(*it);
+      if (b.min_position_ <= -std::numeric_limits<double>::max())
         out << "DBL_MIN";
       else
-        out << b.first;
+        out << b.min_position_;
       out << ", ";
-      if (b.second >= std::numeric_limits<double>::max())
+      if (b.max_position_ >= std::numeric_limits<double>::max())
         out << "DBL_MAX";
       else
-        out << b.second;
+        out << b.max_position_;
       out << "]";
-      if (joint_model_vector_[i]->mimic_)
+      if (joint_model_vector_[i]->getMimic())
         out << " *";
-      if (joint_model_vector_[i]->passive_)
+      if (joint_model_vector_[i]->isPassive())
         out << " +";
       out << std::endl;
     }
@@ -1165,7 +1167,7 @@ void moveit::core::RobotModel::printModelInfo(std::ostream &out) const
   out.flags(old_flags);
 
   out << "Available groups: " << std::endl;
-  for (std::map<std::string, JointModelGroup*>::const_iterator it = joint_model_group_map_.begin() ; it != joint_model_group_map_.end() ; ++it)
+  for (JointModelGroupMap::const_iterator it = joint_model_group_map_.begin() ; it != joint_model_group_map_.end() ; ++it)
   {
     out << "   " << it->first << " (of dimension " << it->second->getVariableCount() << "):" << std::endl;
     out << "     joints:" << std::endl;

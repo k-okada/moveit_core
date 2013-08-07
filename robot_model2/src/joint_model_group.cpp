@@ -139,7 +139,7 @@ moveit::core::JointModelGroup::JointModelGroup(const std::string& group_name,
       if (group_joints[i]->getMimic() == NULL)
       {
         joint_model_vector_.push_back(group_joints[i]);
-        joint_model_index_start_.push_back(variable_count_);
+        joint_model_start_index_.push_back(variable_count_);
         variable_count_ += vc;
       }
       else
@@ -282,13 +282,13 @@ const moveit::core::JointModel* moveit::core::JointModelGroup::getJointModel(con
 void moveit::core::JointModelGroup::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, double *values) const
 {
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
-    joint_model_vector_[i]->getVariableRandomValues(rng, values + joint_model_index_start_[i]);
+    joint_model_vector_[i]->getVariableRandomValues(rng, values + joint_model_start_index_[i]);
 }
 
 void moveit::core::JointModelGroup::getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const double *near, double distance) const
 {
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
-    joint_model_vector_[i]->getVariableRandomValuesNearBy(rng, values + joint_model_index_start_[i], near + joint_model_index_start_[i], distance);
+    joint_model_vector_[i]->getVariableRandomValuesNearBy(rng, values + joint_model_start_index_[i], near + joint_model_start_index_[i], distance);
 }
 
 void moveit::core::JointModelGroup::getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const double *near, const std::map<JointModel::JointType, double> &distance_map) const
@@ -301,7 +301,7 @@ void moveit::core::JointModelGroup::getVariableRandomValuesNearBy(random_numbers
       distance = iter->second;
     else
       logWarn("Did not pass in distance for '%s'", joint_model_vector_[i]->getName().c_str());
-    joint_model_vector_[i]->getVariableRandomValuesNearBy(rng, values + joint_model_index_start_[i], near + joint_model_index_start_[i], distance);
+    joint_model_vector_[i]->getVariableRandomValuesNearBy(rng, values + joint_model_start_index_[i], near + joint_model_start_index_[i], distance);
   }
 }
 
@@ -312,7 +312,7 @@ void moveit::core::JointModelGroup::getVariableRandomValuesNearBy(random_numbers
                     boost::lexical_cast<std::string>(joint_model_vector_.size()) + ", but it is of size " + 
                     boost::lexical_cast<std::string>(distances.size()));  
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
-    joint_model_vector_[i]->getVariableRandomValuesNearBy(rng, values + joint_model_index_start_[i], near + joint_model_index_start_[i], distances[i]);
+    joint_model_vector_[i]->getVariableRandomValuesNearBy(rng, values + joint_model_start_index_[i], near + joint_model_start_index_[i], distances[i]);
 }
 
 double moveit::core::JointModelGroup::getMaximumExtent(void) const
@@ -341,7 +341,7 @@ bool moveit::core::JointModelGroup::getVariableDefaultValues(const std::string &
 void moveit::core::JointModelGroup::getVariableDefaultValues(double *values) const
 {
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
-    joint_model_vector_[i]->getVariableDefaultValues(values + joint_model_index_start_[i]);
+    joint_model_vector_[i]->getVariableDefaultValues(values + joint_model_start_index_[i]);
 }
 
 void moveit::core::JointModelGroup::getVariableDefaultValues(std::map<std::string, double> &values) const
@@ -476,6 +476,8 @@ void moveit::core::JointModelGroup::printGroupInfo(std::ostream &out) const
       out << "]";
       if (joint_model_vector_[i]->getMimic())
         out << " *";
+      if (joint_model_vector_[i]->isPassive())
+        out << " +";
       out << std::endl;
     }
   }

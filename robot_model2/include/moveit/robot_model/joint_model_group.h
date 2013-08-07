@@ -476,7 +476,7 @@ protected:
   std::set<std::string>                                 active_variable_names_set_;
 
   /** \brief For each joint model in this group, hold the index at which the corresponding joint state starts in the group state */
-  std::vector<std::size_t>                              joint_model_index_start_;
+  std::vector<int>                                      joint_model_start_index_;
   
   /** \brief The links that are on the direct lineage between joints
       and joint_roots_, as well as the children of the joint leafs.

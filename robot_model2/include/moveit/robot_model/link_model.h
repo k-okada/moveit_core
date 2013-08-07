@@ -118,6 +118,8 @@ public:
   {
     return joint_origin_transform_;
   }
+
+  void setJointOriginTransform(const Eigen::Affine3d &transform);
   
   /** \brief In addition to the link transform, the geometry
       of a link that is used for collision checking may have
@@ -133,6 +135,8 @@ public:
     return shapes_;
   }
 
+  void setGeometry(const std::vector<shapes::ShapeConstPtr> &shapes, const EigenSTL::vector_Affine3d &origins);
+  
   /** \brief Get shape associated to the collision geometry for this link */
   //  const shapes::ShapeMsg& getShapeMsg() const
   //  {
@@ -170,6 +174,8 @@ public:
     return visual_mesh_scale_;
   }
 
+  void setVisualMesh(const std::string &visual_mesh, const Eigen::Vector3d &scale);
+  
 private:
 
   /** \brief Name of the link */

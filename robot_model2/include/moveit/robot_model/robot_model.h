@@ -225,6 +225,25 @@ public:
   /** \brief Compute the default values for a RobotState */
   void getVariableDefaultValues(double *values) const;
 
+  /** \brief Compute the random values for a RobotState */
+  void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::vector<double> &values) const
+  {
+    values.resize(variable_count_);
+    getVariableRandomValues(rng, &values[0]);
+  }
+  
+  /** \brief Compute the default values for a RobotState */
+  void getVariableDefaultValues(std::vector<double> &values) const
+  {
+    values.resize(variable_count_);
+    getVariableDefaultValues(&values[0]);
+  }
+  
+  /** \brief Compute the random values for a RobotState */
+  void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::map<std::string, double> &values) const;
+
+  /** \brief Compute the default values for a RobotState */
+  void getVariableDefaultValues(std::map<std::string, double> &values) const;
 
   /** \defgroup RobotModel_JointGroupModelAccess Access to joint groups
    *  @{
@@ -313,12 +332,6 @@ protected:
   //  {
   //    return joint_model_group_config_map_;
   //  }
-
-  /** \brief Compute the random values for a RobotState */
-  //  void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::map<std::string, double> &values) const;
-
-  /** \brief Compute the default values for a RobotState */
-  //  void getVariableDefaultValues(std::map<std::string, double> &values) const;
 
 
   /** \brief Get the set of link models that follow a parent link in the kinematic chain */
@@ -419,6 +432,8 @@ protected:
       Additionaly, it includes the names of the joints and the index for the first variable of that joint. */
   VariableIndexMap                              joint_variables_index_map_;
 
+  std::vector<int>                              joint_model_start_index_;
+  
   /** \brief The bounds for all the variables that make up the joints in this model */
   VariableBoundsMap                             variable_bounds_;
 
