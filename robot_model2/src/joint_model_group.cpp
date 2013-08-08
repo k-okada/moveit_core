@@ -267,7 +267,10 @@ const moveit::core::LinkModel* moveit::core::JointModelGroup::getLinkModel(const
 {
   boost::container::flat_map<std::string, const LinkModel*>::const_iterator it = link_model_map_.find(name);
   if (it == link_model_map_.end())
-    throw Exception("Link '" + name + "' not found in group '" + name_ + "'");
+  {
+    logError("Link '%s' not found in group '%s'", name.c_str(), name_.c_str());
+    return NULL;
+  }
   return it->second;
 }
 
@@ -275,7 +278,10 @@ const moveit::core::JointModel* moveit::core::JointModelGroup::getJointModel(con
 {
   boost::container::flat_map<std::string, const JointModel*>::const_iterator it = joint_model_map_.find(name);
   if (it == joint_model_map_.end())
-    throw Exception("Joint '" + name + "' not found in group '" + name_ + "'");
+  {
+    logError("Joint '%s' not found in group '%s'", name.c_str(), name_.c_str());
+    return NULL;
+  }
   return it->second;
 }
 

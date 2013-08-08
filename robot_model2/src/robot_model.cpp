@@ -86,16 +86,12 @@ moveit::core::RobotModel::~RobotModel()
 
 const moveit::core::JointModel* moveit::core::RobotModel::getRootJoint() const
 {
-  if (root_joint_)
-    return root_joint_;
-  throw Exception("No root joint in robot model");
+  return root_joint_;
 }
 
 const moveit::core::LinkModel* moveit::core::RobotModel::getRootLink() const
 {
-  if (root_link_)
-    return root_link_;
-  throw Exception("No root link in robot model");
+  return root_link_;
 }
 
 void moveit::core::RobotModel::buildModel(const urdf::ModelInterface &urdf_model, const srdf::Model &srdf_model)
@@ -132,6 +128,66 @@ void moveit::core::RobotModel::buildModel(const urdf::ModelInterface &urdf_model
     logWarn("No root link found");
 }
 
+namespace moveit
+{
+namespace core
+{
+namespace 
+{
+void computeDescendantsHelper(const JointModel *joint, std::vector<const JointModel*> &parents)
+{
+  if (!joint)
+    return;
+  
+  for (std::size_t i = 0 ; i < parents.size() ; ++i)
+    const_cast<JointModel*>(parents[i])->addDescendantJoint(joint);
+  
+  const LinkModel *lm = joint->getChildLinkModel();
+  if (!lm)
+    return;
+  
+  for (std::size_t i = 0 ; i < parents.size() ; ++i)
+    const_cast<JointModel*>(parents[i])->addDescendantLink(lm);
+  
+  parents.push_back(joint);
+  const std::vector<const JointModel*> &ch = lm->getChildJointModels();
+  for (std::size_t i = 0 ; i < ch.size() ; ++i)
+    computeDescendantsHelper(ch[i], parents);
+  const std::vector<const JointModel*> &mim = joint->getMimicRequests();
+  for (std::size_t i = 0 ; i < mim.size() ; ++i)
+    computeDescendantsHelper(mim[i], parents);
+  parents.pop_back();
+}
+
+void computeCommonRoots(const JointModel *joint, std::vector<int> &common_roots, int size)
+{
+  if (!joint)
+    return;
+  const LinkModel *lm = joint->getChildLinkModel();
+  if (!lm)
+    return;
+  
+  const std::vector<const JointModel*> &ch = lm->getChildJointModels();
+  for (std::size_t i = 0 ; i < ch.size() ; ++i)
+  {
+    const std::vector<const JointModel*> &a = ch[i]->getDescendantJointModels();
+    for (std::size_t j = i + 1 ; j < ch.size() ; ++j)
+    {
+      const std::vector<const JointModel*> &b = ch[j]->getDescendantJointModels();
+      for (std::size_t k = 0 ; k < a.size() ; ++k)
+        for (std::size_t m = 0 ; m < b.size() ; ++m)
+          common_roots[a[k]->getJointIndex() * size + b[m]->getJointIndex()] = 
+            common_roots[a[k]->getJointIndex() + b[m]->getJointIndex() * size] = joint->getJointIndex();
+    }
+    computeCommonRoots(ch[i], common_roots, size);
+  }
+}
+
+}
+}
+}
+
+
 void moveit::core::RobotModel::buildJointInfo()
 {
   // construct additional maps for easy access by name
@@ -154,8 +210,11 @@ void moveit::core::RobotModel::buildJointInfo()
         {
           joint_variables_index_map_[name_order[j]] = variable_count_ + j;
           active_variable_names_.push_back(name_order[j]);
+          joints_of_variable_.push_back(joint_model_vector_[i]);
         }
         joint_model_start_index_[i] = variable_count_;
+        joint_model_vector_[i]->setFirstVariableIndex(variable_count_);
+        joint_model_vector_[i]->setJointIndex(i);
         joint_variables_index_map_[joint_model_vector_[i]->getName()] = variable_count_;
 
         // compute variable count
@@ -178,6 +237,14 @@ void moveit::core::RobotModel::buildJointInfo()
         }
     }
   }
+  
+  // compute the list of descendants for all joints
+  std::vector<const JointModel*> dummy;
+  computeDescendantsHelper(root_joint_, dummy);
+  
+  // compute common roots for all pairs of joints
+  common_joint_roots_.resize(joint_model_vector_.size() * joint_model_vector_.size(), 0);
+  computeCommonRoots(root_joint_, common_joint_roots_, joint_model_vector_.size());
 }
 
 void moveit::core::RobotModel::buildGroupStates(const srdf::Model &srdf_model)
@@ -283,7 +350,8 @@ const moveit::core::JointModelGroup* moveit::core::RobotModel::getEndEffector(co
     it = joint_model_group_map_.find(name);
     if (it != joint_model_group_map_.end() && it->second->isEndEffector())
       return it->second;
-    throw Exception("End-effector '" + name + "' not found in model '" + model_name_ + "'");
+    logError("End-effector '%s' not found in model '%s'", name.c_str(), model_name_.c_str());
+    return NULL;
   }
   return it->second;
 }
@@ -296,7 +364,8 @@ moveit::core::JointModelGroup* moveit::core::RobotModel::getEndEffector(const st
     it = joint_model_group_map_.find(name);
     if (it != joint_model_group_map_.end() && it->second->isEndEffector())
       return it->second;
-    throw Exception("End-effector '" + name + "' not found in model '" + model_name_ + "'");
+    logError("End-effector '%s' not found in model '%s'", name.c_str(), model_name_.c_str());
+    return NULL;
   }
   return it->second;
 }
@@ -310,7 +379,10 @@ const moveit::core::JointModelGroup* moveit::core::RobotModel::getJointModelGrou
 {
   JointModelGroupMap::const_iterator it = joint_model_group_map_.find(name);
   if (it == joint_model_group_map_.end())
-    throw Exception("Group '" + name + "' not found in model '" + model_name_ + "'");
+  {
+    logError("Group '%s' not found in model '%s'", name.c_str(), model_name_.c_str());
+    return NULL;
+  }
   return it->second;
 }
 
@@ -318,7 +390,10 @@ moveit::core::JointModelGroup* moveit::core::RobotModel::getJointModelGroup(cons
 {
   JointModelGroupMap::const_iterator it = joint_model_group_map_.find(name);
   if (it == joint_model_group_map_.end())
-    throw Exception("Group '" + name + "' not found in model '" + model_name_ + "'");
+  {    
+    logError("Group '%s' not found in model '%s'", name.c_str(), model_name_.c_str());
+    return NULL;
+  }
   return it->second;
 }
 
@@ -910,7 +985,8 @@ const moveit::core::JointModel* moveit::core::RobotModel::getJointModel(const st
   JointModelMap::const_iterator it = joint_model_map_.find(name);
   if (it != joint_model_map_.end())
     return it->second;
-  throw Exception("Joint '" + name + "' not found in model '" + model_name_ + "'");
+  logError("Joint '%s' not found in model '%s'", name.c_str(), model_name_.c_str());
+  return NULL;
 }
 
 moveit::core::JointModel* moveit::core::RobotModel::getJointModel(const std::string &name)
@@ -918,7 +994,8 @@ moveit::core::JointModel* moveit::core::RobotModel::getJointModel(const std::str
   JointModelMap::const_iterator it = joint_model_map_.find(name);
   if (it != joint_model_map_.end())
     return it->second;
-  throw Exception("Joint '" + name + "' not found in model '" + model_name_ + "'");
+  logError("Joint '%s' not found in model '%s'", name.c_str(), model_name_.c_str());
+  return NULL;
 }
 
 const moveit::core::LinkModel* moveit::core::RobotModel::getLinkModel(const std::string &name) const
@@ -926,7 +1003,8 @@ const moveit::core::LinkModel* moveit::core::RobotModel::getLinkModel(const std:
   LinkModelMap::const_iterator it = link_model_map_.find(name);
   if (it != link_model_map_.end())
     return it->second;
-  throw Exception("Link '" + name + "' not found in model '" + model_name_ + "'");
+  logError("Link '%s' not found in model '%s'", name.c_str(), model_name_.c_str());
+  return NULL;  
 }
 
 moveit::core::LinkModel* moveit::core::RobotModel::getLinkModel(const std::string &name)
@@ -934,7 +1012,8 @@ moveit::core::LinkModel* moveit::core::RobotModel::getLinkModel(const std::strin
   LinkModelMap::const_iterator it = link_model_map_.find(name);
   if (it != link_model_map_.end())
     return it->second;
-  throw Exception("Link '" + name + "' not found in model '" + model_name_ + "'");
+  logError("Link '%s' not found in model '%s'", name.c_str(), model_name_.c_str());
+  return NULL;
 }
 
 /*
@@ -1071,6 +1150,14 @@ void moveit::core::RobotModel::getVariableDefaultValues(std::map<std::string, do
   values.clear();
   for (std::size_t i = 0 ; i < active_variable_names_.size() ; ++i)
     values[active_variable_names_[i]] = tmp[i];
+}
+
+int moveit::core::RobotModel::getVariableIndex(const std::string &variable) const
+{
+  VariableIndexMap::const_iterator it = joint_variables_index_map_.find(variable);
+  if (it == joint_variables_index_map_.end())
+    throw Exception("Variable '" + variable + "' is not known to model '" + model_name_ + "'");
+  return it->second;
 }
 
 void moveit::core::RobotModel::setKinematicsAllocators(const std::map<std::string, SolverAllocatorFn> &allocators)

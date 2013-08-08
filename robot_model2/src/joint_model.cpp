@@ -50,6 +50,8 @@ moveit::core::JointModel::JointModel(const std::string& name)
   , passive_(false)
   , distance_factor_(1.0)
   , tree_index_(-1)
+  , joint_index_(-1)
+  , first_variable_index_(-1)
 {
 }
 
@@ -136,4 +138,14 @@ void moveit::core::JointModel::setMimic(const JointModel *mimic, double factor, 
 void moveit::core::JointModel::addMimicRequest(const JointModel *joint)
 {
   mimic_requests_.push_back(joint);
+}
+
+void moveit::core::JointModel::addDescendantJoint(const JointModel *joint)
+{
+  descendant_joint_models_.push_back(joint);    
+}
+
+void moveit::core::JointModel::addDescendantLink(const LinkModel *link)
+{
+  descendant_link_models_.push_back(link);
 }

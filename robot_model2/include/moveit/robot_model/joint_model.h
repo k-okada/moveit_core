@@ -78,7 +78,7 @@ struct VariableBounds
 };
 
 /** \brief Data type for holding mappings from variable names to their position in a state vector */
-typedef boost::container::flat_map<std::string, std::size_t> VariableIndexMap;
+typedef boost::container::flat_map<std::string, int> VariableIndexMap;
 typedef boost::container::flat_map<std::string, VariableBounds> VariableBoundsMap;
 
 class LinkModel;
@@ -198,6 +198,26 @@ public:
     return variable_names_.size();
   }
 
+  int getFirstVariableIndex() const
+  {
+    return first_variable_index_;
+  }
+  
+  void setFirstVariableIndex(int index)
+  {
+    first_variable_index_ = index;
+  }
+  
+  int getJointIndex() const
+  {
+    return joint_index_;
+  }
+  
+  void setJointIndex(int index)
+  {
+    joint_index_ = index;
+  }
+  
   /** @} */
 
   /** @name Functionality specific to computing state values
@@ -329,11 +349,19 @@ public:
 
   /** \brief Notify this joint that there is another joint that mimics it */
   void addMimicRequest(const JointModel *joint);
-  
+  void addDescendantJoint(const JointModel *joint);
+  void addDescendantLink(const LinkModel *link);
+
   /** \brief Get all the link models that descend from this joint, in the kinematic tree */
   const std::vector<const LinkModel*>& getDescendantLinkModels() const
   {
     return descendant_link_models_;
+  }
+
+  /** \brief Get all the joint models that descend from this joint, in the kinematic tree */
+  const std::vector<const JointModel*>& getDescendantJointModels() const
+  {
+    return descendant_joint_models_;
   }
   
   /** \brief Check if this joint is passive */
@@ -395,7 +423,7 @@ protected:
   /** \brief Map from variable names to the corresponding index in variable_names_ (indexing makes sense within the JointModel only) */
   VariableIndexMap                                     variable_index_map_;
 
-  std::vector<std::size_t>                             variable_index_;
+  std::vector<int>                                     variable_index_;
 
   /** \brief The link before this joint */
   const LinkModel                                     *parent_link_model_;
@@ -417,6 +445,9 @@ protected:
   
   /** \brief Pointers to all the links that will be moved if this joint changes value */
   std::vector<const LinkModel*>                        descendant_link_models_;
+
+  /** \brief Pointers to all the links that will be moved if this joint changes value */
+  std::vector<const JointModel*>                       descendant_joint_models_;
   
   /** \brief Specify whether this joint is marked as passive in the SRDF */
   bool                                                 passive_;
@@ -424,6 +455,12 @@ protected:
   /** \brief The factor applied to the distance between two joint states */
   double                                               distance_factor_;
 
+  /** \brief The index of this joint's first variable, in the complete robot state */
+  int                                                  first_variable_index_;
+
+  /** \brief Index for this joint in the array of joints of the complete model */
+  int                                                  joint_index_;
+  
   /** \brief The index assigned to this joint when traversing the kinematic tree in depth first fashion */
   int                                                  tree_index_;
 };

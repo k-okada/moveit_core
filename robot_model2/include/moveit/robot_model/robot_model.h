@@ -128,7 +128,7 @@ public:
   
   /** \brief Check if a joint exists. Return true if it does. */
   bool hasJointModel(const std::string &name) const;
-  
+    
   /** \brief Get a joint by its name. Throw an exception when the joint is missing. */
   const JointModel* getJointModel(const std::string &joint) const;
 
@@ -161,17 +161,22 @@ public:
   {
     return continuous_joint_model_vector_;
   }
-
+  
+  const JointModel* getJointOfVariable(int variable_index) const
+  {
+    return joints_of_variable_[variable_index];
+  }
+  
   /** @} */
 
   /** \defgroup RobotModel_LinkModelAccess Access to link models
    *  @{
    */
 
-  /** \brief Get the physical root link of the robot. Throws an exception if the model is empty. */
+  /** \brief Get the physical root link of the robot. */
   const LinkModel* getRootLink() const;
 
-  /** \brief Get the name of the root link of the robot. Throws an exception if the model is empty. */
+  /** \brief Get the name of the root link of the robot. */
   const std::string& getRootLinkName() const
   {
     return getRootLink()->getName();
@@ -322,6 +327,15 @@ public:
     return joint_variables_index_map_;
   }
 
+  /** \brief Get the index of a variable in the robot state */
+  int getVariableIndex(const std::string &variable) const;
+  
+  /** \brief Get the deepest joint in the kinematic tree that is a common parent of both joints passed as argument */
+  const JointModel* getCommonRoot(const JointModel *a, const JointModel *b) const
+  {
+    return joint_model_vector_[common_joint_roots_[a->getJointIndex() * joint_model_vector_.size() + b->getJointIndex()]];
+  }
+  
   /// A map of known kinematics solvers (associated to their group name)
   void setKinematicsAllocators(const std::map<std::string, SolverAllocatorFn> &allocators);
 
@@ -361,6 +375,9 @@ protected:
   void computeFixedTransforms(const LinkModel *link, const Eigen::Affine3d &transform, 
                               LinkModel::AssociatedFixedTransformMap &associated_transforms);
 
+  /** \brief Given two joints, find their common root */
+  const JointModel* computeCommonRoot(const JointModel *a, const JointModel *b) const;
+  
   // GENERIC INFO
   
   /** \brief The name of the model */
@@ -418,6 +435,14 @@ protected:
   /** \brief The set of continuous joints this model contains */
   std::vector<const JointModel*>                continuous_joint_model_vector_;
 
+  /** \brief For every two joints, the index of the common root for thw joints is stored.
+      
+      for jointA, jointB
+      the index of the common root is located in the array at location
+      jointA->getJointIndex() * nr.joints + jointB->getJointIndex().
+      The size of this array is nr.joints * nr.joints
+   */
+  std::vector<int>                              common_joint_roots_;
 
   // INDEXING
 
@@ -436,8 +461,10 @@ protected:
   
   /** \brief The bounds for all the variables that make up the joints in this model */
   VariableBoundsMap                             variable_bounds_;
-
-
+  
+  /** \brief The joints that correspond to each variable index */
+  std::vector<const JointModel*>                joints_of_variable_;
+  
   // GROUPS
 
   /** \brief A map from group names to joint groups */

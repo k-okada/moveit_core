@@ -34,10 +34,10 @@
 
 /* Author: Ioan Sucan */
 
-#include <moveit/robot_state2/robot_state.h>
+#include <moveit/robot_state/robot_state.h>
 #include <geometric_shapes/shape_operations.h>
 
-moveit::core::RobotState::RobotState(const robot_model::RobotModelConstPtr &robot_model, AllocComponents alloc_components) : 
+moveit::core::RobotState::RobotState(const RobotModelConstPtr &robot_model, AllocComponents alloc_components) : 
     robot_model_(robot_model),
     called_new_for_(ALLOC_POSITION),
     position_(new double[robot_model->getVariableCount() * 
@@ -50,84 +50,84 @@ moveit::core::RobotState::RobotState(const robot_model::RobotModelConstPtr &robo
     global_collision_body_transforms_(NULL),
     dirty_fk_(0)
 {
-    if (alloc_components & ALLOC_TRANSFORMS)
-	allocTransforms();
+  if (alloc_components & ALLOC_TRANSFORMS)
+    allocTransforms();
 }
 
 moveit::core::RobotState(const RobotState &other)
 {
-    if (this != &other)
-	copyFrom(other);
+  if (this != &other)
+    copyFrom(other);
 }
 
 moveit::core::RobotState::~RobotState()
 {
-    delete[] position_;
-    if (called_new_for_ & ALLOC_VELOCITY)
-	delete[] velocity_;
-    if (called_new_for_ & ALLOC_ACCELERATION)
-	delete[] acceleration_;
-    if (variable_joint_transforms_)
-	delete[] variable_joint_transforms_;
+  delete[] position_;
+  if (called_new_for_ & ALLOC_VELOCITY)
+    delete[] velocity_;
+  if (called_new_for_ & ALLOC_ACCELERATION)
+    delete[] acceleration_;
+  if (variable_joint_transforms_)
+    delete[] variable_joint_transforms_;
 }
 
 void moveit::core::RobotState::copyFrom(const RobotState &other)
+{
+  robot_model_ = other.robot_model_;
+  
+  // if the other state has allocated memory for transforms, we may have to copy data
+  if (other.variable_joint_transforms_)
   {
-    robot_model_ = other.robot_model_;
+    // if this state does not have memory allocated for transforms yet, allocate it
+    if (!variable_joint_transforms_)
+      allocTransforms();
     
-    // if the other state has allocated memory for transforms, we may have to copy data
-    if (other.variable_joint_transforms_)
+    // if the other state is fully computed, it is worth copying the data
+    if (other.dirty_fk_ < 0)
     {
-	// if this state does not have memory allocated for transforms yet, allocate it
-      if (!variable_joint_transforms_)
-	  allocTransforms();
-
-      // if the other state is fully computed, it is worth copying the data
-      if (other.dirty_fk_ < 0)
-      {
-	  transforms_ = other.transforms_;
-	  dirty_fk_ = -1;
-      }
-      else
-	  // otherwise, we will just assume everything is dirty and re-compute when needed
-	  dirty_fk_ = 0;
+      transforms_ = other.transforms_;
+      dirty_fk_ = -1;
     }
     else
-	// no transforms to copy, so everything is dirty
-	dirty_fk_ = 0;
-
-    // if we have previously allocated some memory, 
-    if (position_)
-    {
-	// see if more memory needs to be allocated, minimizing calls to new
-      if (other.acceleration_)
-	allocAcceleration();
-      else
-        if (other.velocity_)
-	    allocVelocity();
-      // copy the data. we use 3 calls to memcpy to avoid problems of non-contiguous blocks at source & destination
-      std::size_t c = robot_model_->getVariableCount() * sizeof(double);
-      memcpy(position_, other.position_, c);
-      if (other.velocity_)
-	  memcpy(velocity_, other.velocity_, c);
-      if (other.acceleration_)
-	  memcpy(acceleration_, other.acceleration_, c);      
-    }
-    else
-    {
-	// we allocate all the memory we need in one block
-      std::size_t c = robot_model_->getVariableCount();
-      position_ = new double[(1 + (other.velocity_ ? 1 : 0) + (other.acceleration_ ? 1 : 0)) * c];
-      c *= sizeof(double);
-
-      // copy the data. we use 3 calls to memcpy to avoid problems of non-contiguous blocks at source & destination
-      memcpy(position_, other.position_, c);
-      if (other.velocity_)
-	  memcpy(velocity_, other.velocity_, c);
-      if (other.acceleration_)
-	  memcpy(acceleration_, other.acceleration_, c);
-    }
-    
-    // copy attached bodies
-    
+      // otherwise, we will just assume everything is dirty and re-compute when needed
+      dirty_fk_ = 0;
   }
+  else
+    // no transforms to copy, so everything is dirty
+    dirty_fk_ = 0;
+  
+  // if we have previously allocated some memory, 
+  if (position_)
+  {
+    // see if more memory needs to be allocated, minimizing calls to new
+    if (other.acceleration_)
+      allocAcceleration();
+    else
+      if (other.velocity_)
+        allocVelocity();
+    // copy the data. we use 3 calls to memcpy to avoid problems of non-contiguous blocks at source & destination
+    std::size_t c = robot_model_->getVariableCount() * sizeof(double);
+    memcpy(position_, other.position_, c);
+    if (other.velocity_)
+      memcpy(velocity_, other.velocity_, c);
+    if (other.acceleration_)
+      memcpy(acceleration_, other.acceleration_, c);      
+  }
+  else
+  {
+    // we allocate all the memory we need in one block
+    std::size_t c = robot_model_->getVariableCount();
+    position_ = new double[(1 + (other.velocity_ ? 1 : 0) + (other.acceleration_ ? 1 : 0)) * c];
+    c *= sizeof(double);
+    
+    // copy the data. we use 3 calls to memcpy to avoid problems of non-contiguous blocks at source & destination
+    memcpy(position_, other.position_, c);
+    if (other.velocity_)
+      memcpy(velocity_, other.velocity_, c);
+    if (other.acceleration_)
+      memcpy(acceleration_, other.acceleration_, c);
+  }
+  
+  // copy attached bodies
+  
+}
