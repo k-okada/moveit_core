@@ -99,7 +99,7 @@ public:
       dirtyFK(index);
     }
   }
-    
+  
   void setVariablePositions(const std::vector<std::string>& variable_names, const std::vector<double>& variable_position)
   {
     for (std::size_t i = 0 ; i < variable_names.size() ; ++i)
@@ -160,10 +160,9 @@ public:
   
   void setJointPositions(const JointModel *joint, const double *position)
   {  
-    const int index = joint->getFirstVariableIndex();
-    memcpy(position_ + index, position, joint->getVariableCount() * sizeof(double));
-    updateMimicPosition(index);
-    dirtyFK(index);
+    memcpy(position_ + joint->getFirstVariableIndex(), position, joint->getVariableCount() * sizeof(double));
+    updateMimicJoint(joint);
+    dirtyFK(joint);
   }
   
   void setJointPositions(const std::string &joint_name, const Eigen::Affine3d& transform)
@@ -173,10 +172,9 @@ public:
   
   void setJointPositions(const JointModel *joint, const Eigen::Affine3d& transform)
   {
-    const int index = joint->getFirstVariableIndex();
-    joint->computeVariableValues(transform, position_ + index);
-    updateMimicPosition(index);
-    dirtyFK(index);
+    joint->computeVariableValues(transform, position_ + joint->getFirstVariableIndex());
+    updateMimicJoint(joint);
+    dirtyFK(joint);
   }
   
   const double* getJointPositions(const std::string &joint_name) const
@@ -195,47 +193,73 @@ public:
    *  @{
    */
   
+  void setJointGroupPositions(const std::string &joint_group_name, const double *gstate)
+  {
+    const JointModelGroup *jmg = robot_model_->getJointModelGroup(joint_group_name);
+    if (jmg)
+      setJointGroupPositions(jmg, gstate);
+  }
+  
   void setJointGroupPositions(const std::string &joint_group_name, const std::vector<double> &gstate)
   {
-    setJointGroupPositions(robot_model_->getJointModelGroup(joint_group_name), gstate);
+    const JointModelGroup *jmg = robot_model_->getJointModelGroup(joint_group_name);
+    if (jmg)
+      setJointGroupPositions(jmg, &gstate[0]);
   }
   
   void setJointGroupPositions(const JointModelGroup *group, const std::vector<double> &gstate)
   {
+    setJointGroupPositions(group, &gstate[0]);
+  }
+  
+  void setJointGroupPositions(const JointModelGroup *group, const double *gstate)
+  {
+    const std::vector<int> &il = group->getVariableIndexList();
     if (group->isContiguousWithinState())
-      memcpy(positions_ + group->getFirstVariableIndex(), &gstate[0], group->getVariableCount() * sizeof(double));
+      memcpy(position_ + il[0], gstate, group->getVariableCount() * sizeof(double));
     else
     {
-      const std::vector<std::size_t> &index = group->getIndexList();
-      for (std::size_t i = 0 ; i < index.size() ; ++i)
-        position_[index[i]] = gstate[i];
+      for (std::size_t i = 0 ; i < il.size() ; ++i)
+        position_[il[i]] = gstate[i];
     }
-    const std::vector<std::size_t> &mimic = group->getMimicJoints();
+    const std::vector<const JointModel*> &mimic = group->getMimicJointModels();
     for (std::size_t i = 0 ; i < mimic.size() ; ++i)
-      updateMimic(mimic[i]);
-    
+      updateMimicJoint(mimic[i]);
+    dirtyFK(group->getCommonRoot());
   }
   
   void copyJointGroupPositions(const std::string &joint_group_name, std::vector<double> &gstate) const
   {
-    return copyJointGroupPositions(robot_model_->getJointModelGroup(joint_group_name), gstate);
+    const JointModelGroup *jmg = robot_model_->getJointModelGroup(joint_group_name);
+    if (jmg)
+    {
+      gstate.resize(jmg->getVariableCount());
+      copyJointGroupPositions(jmg, &gstate[0]);
+    }
+  }
+  
+  void copyJointGroupPositions(const std::string &joint_group_name, double *gstate) const
+  {
+    const JointModelGroup *jmg = robot_model_->getJointModelGroup(joint_group_name);
+    if (jmg)
+      copyJointGroupPositions(jmg, gstate);
   }
   
   void copyJointGroupPositions(const JointModelGroup *group, std::vector<double> &gstate) const
   {
+    gstate.resize(group->getVariableCount());
+    copyJointGroupPositions(group, &gstate[0]);
+  }
+  
+  void copyJointGroupPositions(const JointModelGroup *group, double *gstate) const
+  {
+    const std::vector<int> &il = group->getVariableIndexList();
     if (group->isContiguousWithinState())
-    {
-      std::size_t c = group->getVariableCount();
-      gstate.resize(c);
-      memcpy(&gstate[0], positions_ + group->getFirstVariableIndex(), c * sizeof(double));
-    }
+      memcpy(gstate, position_ + il[0], group->getVariableCount() * sizeof(double));
     else
     {
-      std::size_t c = group->getVariableCount();
-      gstate.resize(c);
-      const std::vector<std::size_t> &index = group->getIndexList();
-      for (std::size_t i = 0 ; i < index.size() ; ++i)
-        gstate[i] = position_[index[i]];
+      for (std::size_t i = 0 ; i < il.size() ; ++i)
+        gstate[i] = position_[il[i]];
     }
   }
   
@@ -251,12 +275,12 @@ public:
   {
     return position_;
   }
-
+  
   const double* getStatePositions() const
   {
     return position_;
   }
-
+  
   double* getStateVelocity()
   {
     return velocity_;
@@ -443,11 +467,11 @@ public:
   }
   
   void interpolate(const RobotState &to, double t, RobotState &state, const JointModelGroup *joint_group);
-
+  
   void interpolate(const double *to, double t, double *state);
   void interpolate(const double *to, double t, double *state, const JointModel *joint);
   void interpolate(const double *to, double t, double *state, const JointModelGroup *joint_group);
-
+  
   void enforceBounds();
   void enforceBounds(const JointModel *joint);
   void enforceBounds(const JointModelGroup *joint_group);
@@ -519,19 +543,44 @@ private:
     dirty_fk_ = dirty_fk_ == NULL ? robot_model_->getJointOfVariable(index) : robot_model_->getCommonRoot(dirty_fk_, robot_model_->getJointOfVariable(index));
   }
   
+  void dirtyFK(const JointModel *joint)
+  {
+    dirty_fk_ = dirty_fk_ == NULL ? joint : robot_model_->getCommonRoot(dirty_fk_, joint);
+  }
+  
   void updateMimicPosition(int index)
   {
     const JointModel *jm = robot_model_->getJointOfVariable(index);
     if (jm)
     {
+      double v = position_[index];
       const std::vector<const JointModel*> &mim = jm->getMimicRequests();
-      double v = positions_[index];
-      //      for (std::size_t i = 0 ; i < mim.size() ; ++i)
-      //        positions_[mim[i]->getMimic  mim[i]->getMimicFactor() * v + mim[i]->getMimicOffset()
-             
+      for (std::size_t i = 0 ; i < mim.size() ; ++i)
+        position_[mim[i]->getMimic  mim[i]->getMimicFactor() * v + mim[i]->getMimicOffset()
       
+      updateMimic(jm->getMimicRequests(), index);
     }
+    
   }
+  
+  void updateMimicJoint(const JointModel *joint)
+  {
+    int idx = joint->getFirstVariableIndex();
+    if (idx >= 0)
+      updateMimic(joint, idx);
+  }
+  
+  void updateMimic(const JointModel *joint, int index)
+  {
+    const std::vector<const JointModel*> &mim = jm->getMimicRequests();
+    double v = position_ + v
+    double v = position_[index];
+    //      for (std::size_t i = 0 ; i < mim.size() ; ++i)
+    //        position_[mim[i]->getMimic  mim[i]->getMimicFactor() * v + mim[i]->getMimicOffset()
+    
+    
+  }
+  
   
   RobotModelConstPtr robot_model_;
   AllocComponents called_new_for_;
@@ -539,7 +588,7 @@ private:
   double *position_;
   double *velocity_;
   double *acceleration_;
-
+  
   const JointModel *dirty_fk_;
   const JointModel *dirty_collision_body_transforms_;
   const JointModel *dirty_link_transforms_;

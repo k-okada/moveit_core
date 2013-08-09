@@ -34,6 +34,7 @@
 
 /* Author: Ioan Sucan */
 
+#include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_model/joint_model_group.h>
 #include <moveit/robot_model/revolute_joint_model.h>
 #include <moveit/exceptions/exceptions.h>
@@ -122,7 +123,9 @@ moveit::core::JointModelGroup::JointModelGroup(const std::string& group_name,
                                                const RobotModel* parent_model)
   : parent_model_(parent_model)
   , name_(group_name)
+  , common_root_(NULL)
   , variable_count_(0)
+  , is_contiguous_index_list_(true)
   , is_chain_(false)
   , default_ik_timeout_(0.5)
   , default_ik_attempts_(2)
@@ -138,50 +141,71 @@ moveit::core::JointModelGroup::JointModelGroup(const std::string& group_name,
     unsigned int vc = group_joints[i]->getVariableCount();
     if (vc > 0)
     {
+      const std::vector<std::string>& name_order = group_joints[i]->getVariableNames();
       if (group_joints[i]->getMimic() == NULL)
       {
-        joint_model_vector_.push_back(group_joints[i]);
-        joint_model_start_index_.push_back(variable_count_);
-        variable_count_ += vc;
+        active_joint_model_vector_.push_back(group_joints[i]);
+        active_joint_model_name_vector_.push_back(group_joints[i]->getName());
+        active_joint_model_start_index_.push_back(variable_count_);
+        for (std::size_t j = 0; j < name_order.size(); ++j)
+        {
+          active_variable_names_.push_back(name_order[j]);
+          active_variable_names_set_.insert(name_order[j]);
+        }
       }
       else
         mimic_joints_.push_back(group_joints[i]);
       
+      int first_index = group_joints[i]->getFirstVariableIndex();
+      for (std::size_t j = 0; j < name_order.size(); ++j)
+      {
+        variable_index_list_.push_back(first_index + j);
+        joint_variables_index_map_[name_order[j]] = variable_count_ + j;
+      }
+      joint_variables_index_map_[group_joints[i]->getName()] = variable_count_;
+      
       if (group_joints[i]->getType() == JointModel::REVOLUTE && 
           static_cast<const RevoluteJointModel*>(group_joints[i])->isContinuous())
         continuous_joint_model_vector_.push_back(group_joints[i]);
+
+      variable_count_ += vc;
     }
     else
       fixed_joints_.push_back(group_joints[i]);
   }
   
-  //now we need to find all the set of joints within this group
-  //that root distinct subtrees
-  for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
+  // now we need to find all the set of joints within this group
+  // that root distinct subtrees
+  for (std::size_t i = 0 ; i < active_joint_model_vector_.size() ; ++i)
   {
-    joint_model_name_vector_.push_back(joint_model_vector_[i]->getName());
     bool found = false;
-    const JointModel *joint = joint_model_vector_[i];
     // if we find that an ancestor is also in the group, then the joint is not a root
-    if (!includesParent(joint, this))
-      joint_roots_.push_back(joint_model_vector_[i]);
+    if (!includesParent(active_joint_model_vector_[i], this))
+      joint_roots_.push_back(active_joint_model_vector_[i]);
   }
   
-  // compute joint_variables_index_map_
-  unsigned int vector_index_counter = 0;
-  for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
-  {
-    const std::vector<std::string>& name_order = joint_model_vector_[i]->getVariableNames();
-    for (std::size_t j = 0; j < name_order.size(); ++j)
+  if (variable_index_list_.empty())
+    is_contiguous_index_list_ = false;
+  else
+    for (std::size_t i = 1 ; i < variable_index_list_.size() ; ++i)
+      if (variable_index_list_[i] != variable_index_list_[i - 1] + 1)
+      {
+        is_contiguous_index_list_ = false;
+        break;
+      }
+  /*
+  for (std::size_t i = 0 ; i < mimic_joints_.size() ; ++i)
+    // if the joint we mimic is also in this group, we will need to do updates when sampling
+    if (hasJointModel(mimic_joints_[i]->getMimic()->getName()))
     {
-      joint_variables_index_map_[name_order[j]] = vector_index_counter + j;
-      active_variable_names_.push_back(name_order[j]);
-      active_variable_names_set_.insert(name_order[j]);
+      int src = joint_variables_index_map_[mimic_joints_[i]->getMimic()->getName()];
+      int dest = joint_variables_index_map_[mimic_joints_[i]->getName()];
+      MimicUpdate mu(src, dest, mimic_joints_[i]->getMimicFactor(), mimic_joints_[i]->getMimicOffset());
+      
+      mimic_joints
     }
-    joint_variables_index_map_[joint_model_vector_[i]->getName()] = vector_index_counter;
-    vector_index_counter += name_order.size();
-  }
-
+  
+  */
   // now we need to make another pass for group links (we include the fixed joints here)
   std::set<const LinkModel*> group_links_set;
   for (std::size_t i = 0 ; i < group_joints.size() ; ++i)
@@ -199,6 +223,14 @@ moveit::core::JointModelGroup::JointModelGroup(const std::string& group_name,
       link_model_with_geometry_vector_.push_back(link_model_vector_[i]);
       link_model_with_geometry_name_vector_.push_back(link_model_vector_[i]->getName());
     }
+  }
+  
+  // compute the common root of this group
+  if (!joint_roots_.empty())
+  {
+    common_root_ = joint_roots_[0];
+    for (std::size_t i = 1 ; i < joint_roots_.size() ; ++i)
+      common_root_ = parent_model->getCommonRoot(joint_roots_[i], common_root_);
   }
   
   // compute updated links
@@ -226,7 +258,7 @@ moveit::core::JointModelGroup::JointModelGroup(const std::string& group_name,
     updated_link_model_with_geometry_name_vector_.push_back(updated_link_model_with_geometry_vector_[i]->getName());
   
   // check if this group should actually be a chain
-  if (joint_roots_.size() == 1 && joint_model_vector_.size() > 1 && !is_chain_)
+  if (joint_roots_.size() == 1 && active_joint_model_vector_.size() > 1 && !is_chain_)
   {
     bool chain = true;
     // due to our sorting, the joints are sorted in a DF fashion, so looking at them in reverse, 
@@ -289,19 +321,21 @@ const moveit::core::JointModel* moveit::core::JointModelGroup::getJointModel(con
 
 void moveit::core::JointModelGroup::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, double *values) const
 {
-  for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
-    joint_model_vector_[i]->getVariableRandomValues(rng, values + joint_model_start_index_[i]);
+  for (std::size_t i = 0 ; i < active_joint_model_vector_.size() ; ++i)
+    joint_model_vector_[i]->getVariableRandomValues(rng, values + active_joint_model_start_index_[i]);
+  // update mimic
 }
 
 void moveit::core::JointModelGroup::getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const double *near, double distance) const
 {
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
-    joint_model_vector_[i]->getVariableRandomValuesNearBy(rng, values + joint_model_start_index_[i], near + joint_model_start_index_[i], distance);
+    joint_model_vector_[i]->getVariableRandomValuesNearBy(rng, values + joint_active_model_start_index_[i], near + active_joint_model_start_index_[i], distance);
+  // update mimic
 }
 
 void moveit::core::JointModelGroup::getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const double *near, const std::map<JointModel::JointType, double> &distance_map) const
 {
-  for (std::size_t i = 0  ; i < joint_model_vector_.size() ; ++i)
+  for (std::size_t i = 0  ; i < active_joint_model_vector_.size() ; ++i)
   {
     double distance = 0.0;
     std::map<moveit::core::JointModel::JointType, double>::const_iterator iter = distance_map.find(joint_model_vector_[i]->getType());
@@ -309,8 +343,9 @@ void moveit::core::JointModelGroup::getVariableRandomValuesNearBy(random_numbers
       distance = iter->second;
     else
       logWarn("Did not pass in distance for '%s'", joint_model_vector_[i]->getName().c_str());
-    joint_model_vector_[i]->getVariableRandomValuesNearBy(rng, values + joint_model_start_index_[i], near + joint_model_start_index_[i], distance);
+    joint_model_vector_[i]->getVariableRandomValuesNearBy(rng, values + active_joint_model_start_index_[i], near + active_joint_model_start_index_[i], distance);
   }
+  // update mimic
 }
 
 void moveit::core::JointModelGroup::getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const double *near, const std::vector<double> &distances) const
@@ -320,7 +355,7 @@ void moveit::core::JointModelGroup::getVariableRandomValuesNearBy(random_numbers
                     boost::lexical_cast<std::string>(joint_model_vector_.size()) + ", but it is of size " + 
                     boost::lexical_cast<std::string>(distances.size()));  
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
-    joint_model_vector_[i]->getVariableRandomValuesNearBy(rng, values + joint_model_start_index_[i], near + joint_model_start_index_[i], distances[i]);
+    joint_model_vector_[i]->getVariableRandomValuesNearBy(rng, values + active_joint_model_start_index_[i], near + active_joint_model_start_index_[i], distances[i]);
 }
 
 double moveit::core::JointModelGroup::getMaximumExtent(void) const
@@ -349,7 +384,7 @@ bool moveit::core::JointModelGroup::getVariableDefaultValues(const std::string &
 void moveit::core::JointModelGroup::getVariableDefaultValues(double *values) const
 {
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
-    joint_model_vector_[i]->getVariableDefaultValues(values + joint_model_start_index_[i]);
+    active_joint_model_vector_[i]->getVariableDefaultValues(values + active_joint_model_start_index_[i]);
 }
 
 void moveit::core::JointModelGroup::getVariableDefaultValues(std::map<std::string, double> &values) const

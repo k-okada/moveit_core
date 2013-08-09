@@ -142,8 +142,9 @@ public:
     return joint_model_vector_const_;
   }
   
-  /** \brief Get the array of joints, in the order they appear
-      in the robot state. */
+  /** \brief Get the array of joints, in the order they appear in the
+      robot state. This includes all types of joints (including mimic
+      & fixed), as opposed to JointModelGroup::getJointModels(). */
   const std::vector<JointModel*>& getJointModels()
   {
     return joint_model_vector_;
@@ -160,6 +161,13 @@ public:
   const std::vector<const JointModel*>& getContinuousJointModels() const
   {
     return continuous_joint_model_vector_;
+  }
+
+  /** \brief Get the array of mimic joints, in the order they appear
+      in the robot state. */
+  const std::vector<const JointModel*>& getMimicJointModels() const
+  {
+    return mimic_joints_;
   }
   
   const JointModel* getJointOfVariable(int variable_index) const
@@ -333,6 +341,10 @@ public:
   /** \brief Get the deepest joint in the kinematic tree that is a common parent of both joints passed as argument */
   const JointModel* getCommonRoot(const JointModel *a, const JointModel *b) const
   {
+    if (!a)
+      return b;
+    if (!b)
+      return a;
     return joint_model_vector_[common_joint_roots_[a->getJointIndex() * joint_model_vector_.size() + b->getJointIndex()]];
   }
   
@@ -435,6 +447,9 @@ protected:
   /** \brief The set of continuous joints this model contains */
   std::vector<const JointModel*>                continuous_joint_model_vector_;
 
+  /** \brief The set of mimic joints this model contains */
+  std::vector<const JointModel*>                mimic_joints_;
+  
   /** \brief For every two joints, the index of the common root for thw joints is stored.
       
       for jointA, jointB
@@ -505,7 +520,11 @@ protected:
 
   /** \brief Compute helpful information about joints */
   void buildJointInfo();
+
+  /** \brief For every joint, pre-compute the list of descendant joints & links */
   void computeDescendants();
+
+  /** \brief For every pair of joints, pre-compute the common roots of the joints */
   void computeCommonRoots();
   
   /** \brief (This function is mostly intended for internal use). Given a parent link, build up (recursively),

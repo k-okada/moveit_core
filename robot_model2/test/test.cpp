@@ -40,6 +40,7 @@
 #include <fstream>
 #include <gtest/gtest.h>
 #include <boost/filesystem/path.hpp>
+#include <moveit/profiler/profiler.h>
 
 class LoadPlanningModelsPr2 : public testing::Test
 {
@@ -100,10 +101,8 @@ TEST_F(LoadPlanningModelsPr2, Model)
     //    std::cout << joints[i]->getName() << std::endl;
     
   }
-
-  for (std::size_t i = 0 ; i < joints.size() ; ++i)
-    for (std::size_t j = 0 ; j < joints.size() ; ++j)
-      std::cout << joints[i]->getName() << " - " << joints[j]->getName() << " = " << robot_model->getCommonRoot(joints[i], joints[j])->getName() << std::endl;
+  moveit::tools::Profiler::Status();
+  
 }
 
 

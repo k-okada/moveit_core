@@ -103,15 +103,15 @@ public:
 
   /** \brief Get the active joints in this group (that  have controllable DOF).
       This may not be the complete set of joints (see getFixedJointModels() and getMimicJointModels() ) */
-  const std::vector<const JointModel*>& getJointModels() const
+  const std::vector<const JointModel*>& getActiveJointModels() const
   {
-    return joint_model_vector_;
+    return active_joint_model_vector_;
   }
 
   /** \brief Get the names of the active joints in this group. These are the names of the joints returned by getJointModels(). */
-  const std::vector<std::string>& getJointModelNames() const
+  const std::vector<std::string>& getActiveJointModelNames() const
   {
-    return joint_model_name_vector_;
+    return active_joint_model_name_vector_;
   }
 
   /** \brief Get the fixed joints that are part of this group */
@@ -126,7 +126,7 @@ public:
     return mimic_joints_;
   }
 
-  /** \brief Get the array of continuous joints used in thir group. */
+  /** \brief Get the array of continuous joints used in this group (may include mimic joints). */
   const std::vector<const JointModel*>& getContinuousJointModels() const
   {
     return continuous_joint_model_vector_;
@@ -135,7 +135,7 @@ public:
   /** \brief Get the names of the variables that make up the joints included in this group. Only active joints (not
       fixed, not mimic) are included. Effectively, these are the names of the DOF for this group. The number of
       returned elements is always equal to getVariableCount() */
-  const std::vector<std::string>& getVariableNames() const
+  const std::vector<std::string>& getActiveVariableNames() const
   {
     return active_variable_names_;
   }
@@ -152,6 +152,12 @@ public:
     return joint_roots_;
   }
 
+  /** \brief Get the common root of all joint roots; not necessarily part of this group */
+  const JointModel* getCommonRoot() const
+  {
+    return common_root_;
+  }
+  
   /** \brief Get the links that are part of this joint group */
   const std::vector<const LinkModel*>& getLinkModels() const
   {
@@ -228,11 +234,17 @@ public:
   /** \brief A joint group consists of an array of joints. Each joint has a specific ordering of its variables.
       Given the ordering of joints the group maintains, an ordering of all the variables of the group can be then constructed.
       The map from variable names to their position in the joint group state is given by this function */
-  //  const std::map<std::string, unsigned int>& getJointVariablesIndexMap() const
+  //  const VariableIndexMap& getJointVariablesIndexMap() const
   //  {
   //    return joint_variables_index_map_;
   //  }
 
+
+  const std::vector<int>& getVariableIndexList() const
+  {
+    return variable_index_list_;
+  }
+  
   /** \brief Get the names of the known default states (as specified in the SRDF) */
   const std::vector<std::string>& getDefaultStateNames() const
   {
@@ -297,12 +309,13 @@ public:
     getVariableRandomValuesNearBy(rng, &values[0], &near[0], distances);
   }  
 
-  /** \brief Get the number of variables that describe this joint group */
+  /** \brief Get the number of variables that describe this joint group. This includes variables necessary for mimic joints, so will always be >=
+      the number of items returned by getActiveVariableNames() */
   unsigned int getVariableCount() const
   {
     return variable_count_;
   }
-
+  
   /** \brief Set the names of the subgroups for this group */
   void setSubgroupNames(const std::vector<std::string> &subgroups);
 
@@ -330,6 +343,11 @@ public:
     return !end_effector_name_.empty();
   }
 
+  bool isContiguousWithinState() const
+  {
+    return is_contiguous_index_list_; 
+  }
+  
   /** \brief Return the name of the end effector, if this group is an end-effector */
   const std::string& getEndEffectorName() const
   {
@@ -444,22 +462,28 @@ protected:
   std::string                                           name_;
 
   /** \brief Names of joints in the order they appear in the group state */
-  std::vector<std::string>                              joint_model_name_vector_;
+  std::vector<std::string>                              active_joint_model_name_vector_;
 
   /** \brief Joint instances in the order they appear in the group state */
-  std::vector<const JointModel*>                        joint_model_vector_;
+  std::vector<const JointModel*>                        active_joint_model_vector_;
 
-  /** \brief A map from joint names to their instances */
+  /** \brief A map from joint names to their instances. This includes all joints in the group. */
   boost::container::flat_map<std::string, const JointModel*> joint_model_map_;
-
-  /** \brief The list of joint models that are roots in this group */
+  
+  /** \brief The list of active joint models that are roots in this group */
   std::vector<const JointModel*>                        joint_roots_;
 
+  /** \brief The joint that is a common root for all joints in this group (not necessarily part of this group) */
+  const JointModel                                     *common_root_;
+  
   /** \brief The group includes all the joint variables that make up the joints the group consists of.
       This map gives the position in the state vector of the group for each of these variables.
       Additionaly, it includes the names of the joints and the index for the first variable of that joint. */
-  VariableIndexMap joint_variables_index_map_;
+  VariableIndexMap                                      joint_variables_index_map_;
 
+  /** \brief The list of index values this group includes, with respect to a full robot state; this includes mimic joints. */
+  std::vector<int>                                      variable_index_list_;
+    
   /** \brief The joints that have no DOF (fixed) */
   std::vector<const JointModel*>                        fixed_joints_;
 
@@ -475,8 +499,8 @@ protected:
   /** \brief The names of the DOF that make up this group (this is just a sequence of joint variable names; not necessarily joint names!) */
   std::set<std::string>                                 active_variable_names_set_;
 
-  /** \brief For each joint model in this group, hold the index at which the corresponding joint state starts in the group state */
-  std::vector<int>                                      joint_model_start_index_;
+  /** \brief For each active joint model in this group, hold the index at which the corresponding joint state starts in the group state */
+  std::vector<int>                                      active_joint_model_start_index_;
   
   /** \brief The links that are on the direct lineage between joints
       and joint_roots_, as well as the children of the joint leafs.
@@ -521,6 +545,10 @@ protected:
   /** \brief The number of variables necessary to describe this group of joints */
   unsigned int                                          variable_count_;
 
+  /** \brief True if the state of this group is contiguous within the full robot state; this also means that
+      the index values in variable_index_list_ are consecutive integers */
+  bool                                                  is_contiguous_index_list_;
+
   std::vector<moveit_msgs::JointLimits>                 variable_bounds_msg_;
   
   /** \brief The set of labelled subgroups that are included in this group */
@@ -548,6 +576,16 @@ protected:
 
   std::vector<unsigned int>                             ik_joint_bijection_;
 
+  struct MimicUpdate
+  {
+    int src;
+    int dest;
+    double factor;
+    double offset;
+  };
+  
+  std::vector<MimicUpdate>                              mimic_update_;
+  
   double                                                default_ik_timeout_;
 
   unsigned int                                          default_ik_attempts_;

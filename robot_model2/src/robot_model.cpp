@@ -262,24 +262,23 @@ void moveit::core::RobotModel::buildJointInfo()
     for (std::size_t j = 0 ; j < name_order.size() ; ++j)
       variable_bounds_[name_order[j]] = joint_model_vector_[i]->getVariableBounds(name_order[j]);
     
-    if (joint_model_vector_[i]->getMimic() == NULL)
+    // compute index map
+    if (name_order.size() > 0)
     {
-      // compute index map
-      if (name_order.size() > 0)
+      for (std::size_t j = 0; j < name_order.size(); ++j)
       {
-        for (std::size_t j = 0; j < name_order.size(); ++j)
-        {
-          joint_variables_index_map_[name_order[j]] = variable_count_ + j;
-          active_variable_names_.push_back(name_order[j]);
-          joints_of_variable_.push_back(joint_model_vector_[i]);
-        }
-        joint_model_start_index_[i] = variable_count_;
-        joint_model_vector_[i]->setFirstVariableIndex(variable_count_);
-        joint_variables_index_map_[joint_model_vector_[i]->getName()] = variable_count_;
-
-        // compute variable count
-        variable_count_ += joint_model_vector_[i]->getVariableCount();
+        joint_variables_index_map_[name_order[j]] = variable_count_ + j;
+        active_variable_names_.push_back(name_order[j]);
+        joints_of_variable_.push_back(joint_model_vector_[i]);
       }
+      // we lwave this to -1 for mimic joints, since we do not write to those in the normal way
+      if (joint_model_vector_[i]->getMimic() == NULL)
+        joint_model_start_index_[i] = variable_count_;
+      joint_model_vector_[i]->setFirstVariableIndex(variable_count_);
+      joint_variables_index_map_[joint_model_vector_[i]->getName()] = variable_count_;
+      
+      // compute variable count
+      variable_count_ += joint_model_vector_[i]->getVariableCount();
     }
   }
   
@@ -389,7 +388,10 @@ void moveit::core::RobotModel::buildMimic(const urdf::ModelInterface &urdf_model
   // build mimic requests
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
     if (joint_model_vector_[i]->getMimic())
+    {
       const_cast<JointModel*>(joint_model_vector_[i]->getMimic())->addMimicRequest(joint_model_vector_[i]);
+      mimic_joints_.push_back(joint_model_vector_[i]);
+    }
 }
 
 bool moveit::core::RobotModel::hasEndEffector(const std::string& eef) const
@@ -1072,115 +1074,17 @@ moveit::core::LinkModel* moveit::core::RobotModel::getLinkModel(const std::strin
   return NULL;
 }
 
-/*
-void moveit::core::RobotModel::getChildLinkModels(const LinkModel *parent, std::vector<const LinkModel*> &links) const
-{
-  links.clear();
-  links.push_back(parent);
-  std::queue<const LinkModel*> q;
-  std::set<const LinkModel*> seen;
-  q.push(parent);
-  while (!q.empty())
-  {
-    const LinkModel* t = q.front();
-    q.pop();
-    if (seen.insert(t).second)
-      for (std::size_t i = 0 ; i < t->child_joint_models_.size() ; ++i)
-      {
-        links.push_back(t->child_joint_models_[i]->child_link_model_);
-        q.push(t->child_joint_models_[i]->child_link_model_);
-        for (std::size_t j = 0 ; j < t->child_joint_models_[i]->mimic_requests_.size() ; ++j)
-        {
-          links.push_back(t->child_joint_models_[i]->mimic_requests_[j]->child_link_model_);
-          q.push(t->child_joint_models_[i]->mimic_requests_[j]->child_link_model_);
-        }
-      }
-  }
-}
-
-void moveit::core::RobotModel::getChildLinkModels(const JointModel *parent, std::vector<const LinkModel*> &links) const
-{
-  getChildLinkModels(parent->child_link_model_, links);
-}
-
-void moveit::core::RobotModel::getChildJointModels(const LinkModel *parent, std::vector<const JointModel*> &joints) const
-{
-  joints.clear();
-  std::queue<const LinkModel*> q;
-  std::set<const LinkModel*> seen;
-  q.push(parent);
-
-  while (!q.empty())
-  {
-    const LinkModel* t = q.front();
-    q.pop();
-    if (seen.insert(t).second)
-      for (unsigned int i = 0 ; i < t->child_joint_models_.size() ; ++i)
-      {
-        joints.push_back(t->child_joint_models_[i]);
-        q.push(t->child_joint_models_[i]->child_link_model_);
-        for (std::size_t j = 0 ; j < t->child_joint_models_[i]->mimic_requests_.size() ; ++j)
-        {
-          joints.push_back(t->child_joint_models_[i]->mimic_requests_[j]);
-          q.push(t->child_joint_models_[i]->mimic_requests_[j]->child_link_model_);
-        }
-      }
-  }
-}
-
-void moveit::core::RobotModel::getChildJointModels(const JointModel *parent, std::vector<const JointModel*> &joints) const
-{
-  getChildJointModels(parent->child_link_model_, joints);
-  joints.insert(joints.begin(), parent);
-}
-
-std::vector<std::string> moveit::core::RobotModel::getChildLinkModelNames(const LinkModel *parent) const
-{
-  std::vector<const LinkModel*> links;
-  getChildLinkModels(parent, links);
-  std::vector<std::string> ret_vec(links.size());
-  for (std::size_t i = 0; i < links.size(); ++i)
-    ret_vec[i] = links[i]->getName();
-  return ret_vec;
-}
-
-std::vector<std::string> moveit::core::RobotModel::getChildLinkModelNames(const JointModel *parent) const
-{
-  std::vector<const LinkModel*> links;
-  getChildLinkModels(parent, links);
-  std::vector<std::string> ret_vec(links.size());
-  for(unsigned int i = 0; i < links.size(); ++i)
-    ret_vec[i] = links[i]->getName();
-  return ret_vec;
-}
-
-std::vector<std::string> moveit::core::RobotModel::getChildJointModelNames(const LinkModel *parent) const
-{
-  std::vector<const JointModel*> joints;
-  getChildJointModels(parent, joints);
-  std::vector<std::string> ret_vec(joints.size());
-  for(unsigned int i = 0 ; i < joints.size() ; ++i)
-    ret_vec[i] = joints[i]->getName();
-  return ret_vec;
-}
-
-std::vector<std::string> moveit::core::RobotModel::getChildJointModelNames(const JointModel *parent) const
-{
-  std::vector<const JointModel*> joints;
-  getChildJointModels(parent, joints);
-  std::vector<std::string> ret_vec(joints.size());
-  for(unsigned int i = 0 ; i < joints.size(); ++i)
-    ret_vec[i] = joints[i]->getName();
-  return ret_vec;
-}
-
-*/
-
 void moveit::core::RobotModel::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, double *values) const
 {
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
     if (joint_model_start_index_[i] >= 0)
       joint_model_vector_[i]->getVariableRandomValues(rng, values + joint_model_start_index_[i]);
+  for (std::size_t i = 0 ; i < mimic_joints_.size() ; ++i)
+  {
+    int src = mimic_joints_[i]->getMimic()->getFirstStateIndex();
+    int dest = mimic_joints_[i]->getFirstStateIndex();
+    values[dest] = values[src] * mimic_joints_[i]->getMimicFactor() + mimic_joints_[i]->getMimicOffset();
+  }
 }
 
 void moveit::core::RobotModel::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, std::map<std::string, double> &values) const
@@ -1197,6 +1101,12 @@ void moveit::core::RobotModel::getVariableDefaultValues(double *values) const
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
     if (joint_model_start_index_[i] >= 0)
       joint_model_vector_[i]->getVariableDefaultValues(values + joint_model_start_index_[i]);
+  for (std::size_t i = 0 ; i < mimic_joints_.size() ; ++i)
+  {
+    int src = mimic_joints_[i]->getMimic()->getFirstStateIndex();
+    int dest = mimic_joints_[i]->getFirstStateIndex();
+    values[dest] = values[src] * mimic_joints_[i]->getMimicFactor() + mimic_joints_[i]->getMimicOffset();
+  }
 }
 
 void moveit::core::RobotModel::getVariableDefaultValues(std::map<std::string, double> &values) const
