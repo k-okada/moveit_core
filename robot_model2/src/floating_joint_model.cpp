@@ -83,7 +83,6 @@ moveit::core::FloatingJointModel::FloatingJointModel(const std::string& name)
   variable_bounds_[6].min_position_ = -1.0;
   variable_bounds_[6].max_position_ = 1.0;
 
-  variable_index_.resize(7, 0);
   computeVariableBoundsMsg();
 }
 

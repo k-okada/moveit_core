@@ -80,7 +80,7 @@ public:
     
     // the index of the root joint of the system is 0. Since all joint values have potentially
     // changed, we will need to do FK from the root (if FK is ever required)
-    dirty_fk_ = 0;
+    dirty_fk_ = NULL;
   }
   
   void setVariablePositions(const std::vector<double> &position)
@@ -96,7 +96,7 @@ public:
       int index = robot_model_->getVariableIndex(it->first);
       position_[index] = it->second;
       updateMimicPosition(index);
-      dirty_fk_ = dirty_fk_ < 0 ? index : robot_model_->getCommonRoot(dirty_fk_, index);
+      dirtyFK(index);
     }
   }
     
@@ -104,10 +104,10 @@ public:
   {
     for (std::size_t i = 0 ; i < variable_names.size() ; ++i)
     { 
-      std::size_t index = robot_model_->getVariableIndex(variable_names[i]);
+      int index = robot_model_->getVariableIndex(variable_names[i]);
       position_[index] = variable_position[i];  
       updateMimicPosition(index);
-      dirty_fk_ = dirty_fk_ < 0 ? index : robot_model_->getCommonRoot(dirty_fk_, index);
+      dirtyFK(index);
     }
   }
   
@@ -116,11 +116,11 @@ public:
     setVariablePosition(robot_model_->getVariableIndex(variable), value);
   }
   
-  void setVariablePosition(std::size_t variable_index, double value)
+  void setVariablePosition(int index, double value)
   {
-    position_[variable_index] = value;
-    updateMimicPosition(variable_index);
-    dirty_fk_ = dirty_fk_ < 0 ? variable_index : robot_model_->getCommonRoot(dirty_fk_, variable_index);
+    position_[index] = value;
+    updateMimicPosition(index);
+    dirtyFK(index);
   }
   
   const double* getVariablePositions() const
@@ -133,7 +133,7 @@ public:
     return position_ + robot_model_->getVariableIndex(variable);
   }
   
-  const double* getVariablePositions(std::size_t index) const
+  const double* getVariablePositions(int index) const
   {
     return position_ + index;
   }
@@ -163,7 +163,7 @@ public:
     const int index = joint->getFirstVariableIndex();
     memcpy(position_ + index, position, joint->getVariableCount() * sizeof(double));
     updateMimicPosition(index);
-    dirty_fk_ = dirty_fk_ < 0 ? index : robot_model_->getCommonRoot(dirty_fk_, index);
+    dirtyFK(index);
   }
   
   void setJointPositions(const std::string &joint_name, const Eigen::Affine3d& transform)
@@ -174,9 +174,9 @@ public:
   void setJointPositions(const JointModel *joint, const Eigen::Affine3d& transform)
   {
     const int index = joint->getFirstVariableIndex();
-    joint->computeJointStateValues(transform, position_ + index);
+    joint->computeVariableValues(transform, position_ + index);
     updateMimicPosition(index);
-    dirty_fk_ = dirty_fk_ < 0 ? index : robot_model_->getCommonRoot(dirty_fk_, index);
+    dirtyFK(index);
   }
   
   const double* getJointPositions(const std::string &joint_name) const
@@ -186,7 +186,7 @@ public:
   
   const double* getJointPositions(const JointModel *joint) const
   {
-    return positions_ + joint->getFirstVariableIndex();
+    return position_ + joint->getFirstVariableIndex();
   }
   /** @} */
   
@@ -283,19 +283,19 @@ public:
   
   void updateCollisionBodyTransforms()
   {
-    if (dirty_fk_ >= 0)
+    if (dirty_fk_ != NULL)
     {
       updateJointTransforms();
       updateLinkTransforms();
     }
     else
-      if (dirty_link_transforms_ >= 0)
+      if (dirty_link_transforms_ != NULL)
         updateLinkTransforms();
     
-    if (dirty_collision_body_transforms_ >= 0)
+    if (dirty_collision_body_transforms_ != NULL)
     {
-      const std::vector<const LinkModel*> &links = robot_model_->getUpdatedLinkModels(dirty_collision_body_transforms_);
-      dirty_collision_body_transforms_ = -1;
+      const std::vector<const LinkModel*> &links = dirty_collision_body_transforms_->getDescendantLinkModels();
+      dirty_collision_body_transforms_ = NULL;
       for (std::size_t i = 0 ; i < links.size() ; ++i)
 	links[i]->updateCollisionBodyTransforms(&global_collision_body_transforms_->at(links[i]->getCollisionBodyIndex()));
     }
@@ -303,13 +303,16 @@ public:
   
   void updateLinkTransforms()
   {
-    if (dirty_fk_ >= 0)
+    if (dirty_fk_ != NULL)
       updateJointTransforms(); // resets dirty_fk_, makes sure memory is allocated for transforms
-    if (dirty_link_transforms_ >= 0)
+    if (dirty_link_transforms_ != NULL)
     {
-      const std::vector<const LinkModel*> &links = robot_model_->getUpdatedLinkModels(dirty_link_transforms_);
-      dirty_collision_body_transforms_ = dirty_link_transforms_;
-      dirty_link_transforms_ = -1;
+      const std::vector<const LinkModel*> &links = dirty_link_transforms_->getDescendantLinkModels();
+      if (dirty_collision_body_transforms_)
+        dirty_collision_body_transforms_ = robot_model_->getCommonRoot(dirty_collision_body_transforms_, dirty_link_transforms_);
+      else
+        dirty_collision_body_transforms_ = dirty_link_transforms_;
+      dirty_link_transforms_ = NULL;
       for (std::size_t i = 0 ; i < links.size() ; ++i)
 	links[i]->updateTransform(global_link_transforms_->at(links[i]->getIndex()));
       
@@ -327,16 +330,19 @@ public:
   
   void updateJointTransforms()
   {
-    if (dirty_fk_ >= 0)
+    if (dirty_fk_ != NULL)
     {
       const std::vector<const JointModel*> &joint_models = robot_model_->getUpdatedJointModels(dirty_fk_);
-      dirty_link_transforms_ = dirty_fk_;
-      dirty_fk_ = -1;
+      if (dirty_link_transforms_)
+        dirty_link_transforms_ = robot_model_->getCommonRoot(dirty_fk_, dirty_link_transforms_);
+      else
+        dirty_link_transforms_ = dirty_fk_;
+      dirty_fk_ = NULL;
       if (!variable_joint_transforms_)
 	allocTransforms();
       for (std::size_t i = 0 ; i < joint_models.size() ; ++i)
       {
-	int index = joint_models[i]->getIndex();
+	int index = joint_models[i]->getJointIndex();
 	int vindex = joint_models[i]->getFirstVariableIndex();
 	joint_models[i]->updateTransform(position_ + vindex, variable_joint_transforms_->at(index));
       }
@@ -375,8 +381,6 @@ public:
     updateJointTransforms();
     return variable_joint_transforms_->at(joint->getIndex());
   }
-  
-  
   
   const Eigen::Affine3d& getGlobalLinkTransform(const std::string &link_name) const
   {
@@ -510,13 +514,18 @@ private:
     }
   }
   
-  void updateMimicPosition(int variable_index)
+  void dirtyFK(int index)
   {
-    const JointModel *jm = robot_model_->getJointOfVariable(variable_index);
+    dirty_fk_ = dirty_fk_ == NULL ? robot_model_->getJointOfVariable(index) : robot_model_->getCommonRoot(dirty_fk_, robot_model_->getJointOfVariable(index));
+  }
+  
+  void updateMimicPosition(int index)
+  {
+    const JointModel *jm = robot_model_->getJointOfVariable(index);
     if (jm)
     {
       const std::vector<const JointModel*> &mim = jm->getMimicRequests();
-      double v = positions_[variable_index];
+      double v = positions_[index];
       //      for (std::size_t i = 0 ; i < mim.size() ; ++i)
       //        positions_[mim[i]->getMimic  mim[i]->getMimicFactor() * v + mim[i]->getMimicOffset()
              
@@ -531,9 +540,9 @@ private:
   double *velocity_;
   double *acceleration_;
 
-  int dirty_fk_;
-  int dirty_collision_body_transforms_;
-  int dirty_link_transforms_;
+  const JointModel *dirty_fk_;
+  const JointModel *dirty_collision_body_transforms_;
+  const JointModel *dirty_link_transforms_;
   
   EigenSTL::vector_Affine3d transforms_;
   Eigen::Affine3d *variable_joint_transforms_; // this points to an element in transforms_, so it is aligned 

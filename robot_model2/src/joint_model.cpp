@@ -97,14 +97,23 @@ void moveit::core::JointModel::setVariableBounds(const std::vector<moveit_msgs::
       if (jlim[i].joint_name == variable_names_[j])
       {
         variable_bounds_[j].position_bounded_ = jlim[i].has_position_limits;
-        variable_bounds_[j].min_position_ = jlim[i].min_position;
-        variable_bounds_[j].min_position_ = jlim[i].max_position;
+        if (jlim[i].has_position_limits)
+        {
+          variable_bounds_[j].min_position_ = jlim[i].min_position;
+          variable_bounds_[j].min_position_ = jlim[i].max_position;
+        }
         variable_bounds_[j].velocity_bounded_ = jlim[i].has_velocity_limits;
-        variable_bounds_[j].min_position_ = -jlim[i].max_velocity;
-        variable_bounds_[j].min_position_ = jlim[i].max_velocity;
+        if (jlim[i].has_velocity_limits)
+        {
+          variable_bounds_[j].min_position_ = -jlim[i].max_velocity;
+          variable_bounds_[j].min_position_ = jlim[i].max_velocity;
+        }
         variable_bounds_[j].acceleration_bounded_ = jlim[i].has_acceleration_limits;
-        variable_bounds_[j].min_acceleration_ = -jlim[i].max_acceleration;
-        variable_bounds_[j].min_acceleration_ = jlim[i].max_acceleration;
+        if (jlim[i].has_acceleration_limits)
+        {
+          variable_bounds_[j].min_acceleration_ = -jlim[i].max_acceleration;
+          variable_bounds_[j].min_acceleration_ = jlim[i].max_acceleration;
+        }
         break;
       }
   computeVariableBoundsMsg();
@@ -148,4 +157,36 @@ void moveit::core::JointModel::addDescendantJoint(const JointModel *joint)
 void moveit::core::JointModel::addDescendantLink(const LinkModel *link)
 {
   descendant_link_models_.push_back(link);
+}
+
+namespace
+{
+inline void printBoundHelper(std::ostream &out, double v)
+{
+  if (v <= -std::numeric_limits<double>::max())
+    out << "-inf";
+  else
+    if (v >= std::numeric_limits<double>::max())
+      out << "inf";
+    else
+      out << v;  
+}
+}
+
+std::ostream& moveit::core::operator<<(std::ostream &out, const VariableBounds &b)
+{
+  out << "P." << (b.position_bounded_ ? "bounded" : "unbounded") << " [";
+  printBoundHelper(out, b.min_position_);
+  out << ", ";
+  printBoundHelper(out, b.max_position_);
+  out << "]; " << "V." << (b.velocity_bounded_ ? "bounded" : "unbounded") << " [";
+  printBoundHelper(out, b.min_velocity_);
+  out << ", ";
+  printBoundHelper(out, b.max_velocity_);
+  out << "]; " << "A." << (b.acceleration_bounded_ ? "bounded" : "unbounded") << " [";
+  printBoundHelper(out, b.min_acceleration_);
+  out << ", ";
+  printBoundHelper(out, b.max_acceleration_);
+  out << "];";
+  return out;
 }

@@ -52,7 +52,6 @@ moveit::core::RevoluteJointModel::RevoluteJointModel(const std::string& name)
   variable_bounds_[0].min_position_ = -boost::math::constants::pi<double>();
   variable_bounds_[0].max_position_ = boost::math::constants::pi<double>();
   variable_index_map_[name_] = 0;
-  variable_index_.resize(1, 0);
   computeVariableBoundsMsg();
 }
 

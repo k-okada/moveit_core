@@ -48,7 +48,6 @@ moveit::core::PrismaticJointModel::PrismaticJointModel(const std::string& name)
   variable_bounds_[0].min_position_ = -std::numeric_limits<double>::max();
   variable_bounds_[0].max_position_ = std::numeric_limits<double>::max();
   variable_index_map_[name_] = 0;
-  variable_index_.resize(1, 0);
   computeVariableBoundsMsg();  
 }
 

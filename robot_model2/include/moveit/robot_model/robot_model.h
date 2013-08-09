@@ -505,7 +505,9 @@ protected:
 
   /** \brief Compute helpful information about joints */
   void buildJointInfo();
-
+  void computeDescendants();
+  void computeCommonRoots();
+  
   /** \brief (This function is mostly intended for internal use). Given a parent link, build up (recursively),
       the kinematic model by walking  down the tree*/
   JointModel* buildRecursive(LinkModel *parent, const urdf::Link *link, const srdf::Model &srdf_model);

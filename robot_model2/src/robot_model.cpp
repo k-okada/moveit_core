@@ -102,27 +102,41 @@ void moveit::core::RobotModel::buildModel(const urdf::ModelInterface &urdf_model
   root_joint_ = NULL;
   root_link_ = NULL;
   model_name_ = urdf_model.getName();
+  logInform("Loading robot model '%s'...", model_name_.c_str());
+  
   if (urdf_model.getRoot())
   {
     const urdf::Link *root_link_ptr = urdf_model.getRoot().get();
     model_frame_ = '/' + root_link_ptr->name;
 
+    logInform("... building kinematic chain"); 
     root_joint_ = buildRecursive(NULL, root_link_ptr, srdf_model);
     if (root_joint_)
       root_link_ = root_joint_->getChildLinkModel();
+    logInform("... building mimic joints"); 
     buildMimic(urdf_model);
+
+    logInform("... computing joint indexing"); 
     buildJointInfo();
 
     if (link_models_with_collision_geometry_vector_.empty())
       logWarn("No geometry is associated to any robot links");
 
     // build groups
+
+    logInform("... constructing joint groups"); 
     buildGroups(srdf_model);
+
+    logInform("... constructing joint group states"); 
     buildGroupStates(srdf_model);
+
+    logInform("Done!");
 
     std::stringstream ss;
     printModelInfo(ss);
     logDebug("%s", ss.str().c_str());
+    std::cout << ss.str() << std::endl;
+    
   }
   else
     logWarn("No root link found");
@@ -159,7 +173,7 @@ void computeDescendantsHelper(const JointModel *joint, std::vector<const JointMo
   parents.pop_back();
 }
 
-void computeCommonRoots(const JointModel *joint, std::vector<int> &common_roots, int size)
+void computeCommonRootsHelper(const JointModel *joint, std::vector<int> &common_roots, int size)
 {
   if (!joint)
     return;
@@ -174,12 +188,19 @@ void computeCommonRoots(const JointModel *joint, std::vector<int> &common_roots,
     for (std::size_t j = i + 1 ; j < ch.size() ; ++j)
     {
       const std::vector<const JointModel*> &b = ch[j]->getDescendantJointModels();
+      for (std::size_t m = 0 ; m < b.size() ; ++m)
+        common_roots[ch[i]->getJointIndex() * size + b[m]->getJointIndex()] = 
+          common_roots[ch[i]->getJointIndex() + b[m]->getJointIndex() * size] = joint->getJointIndex();
       for (std::size_t k = 0 ; k < a.size() ; ++k)
+      {
+        common_roots[a[k]->getJointIndex() * size + ch[j]->getJointIndex()] = 
+          common_roots[a[k]->getJointIndex() + ch[j]->getJointIndex() * size] = joint->getJointIndex();
         for (std::size_t m = 0 ; m < b.size() ; ++m)
           common_roots[a[k]->getJointIndex() * size + b[m]->getJointIndex()] = 
             common_roots[a[k]->getJointIndex() + b[m]->getJointIndex() * size] = joint->getJointIndex();
+      }
     }
-    computeCommonRoots(ch[i], common_roots, size);
+    computeCommonRootsHelper(ch[i], common_roots, size);
   }
 }
 
@@ -187,16 +208,56 @@ void computeCommonRoots(const JointModel *joint, std::vector<int> &common_roots,
 }
 }
 
+void moveit::core::RobotModel::computeCommonRoots()
+{
+  // compute common roots for all pairs of joints; 
+  // there are 3 cases of pairs (X, Y):
+  //    X != Y && X and Y are not descendants of one another
+  //    X == Y
+  //    X != Y && X and Y are descendants of one another
+  
+  // by default, the common root is always the global root;
+  common_joint_roots_.resize(joint_model_vector_.size() * joint_model_vector_.size(), 0);
+  
+  // look at all descendants recursively; for two sibling nodes A, B, both children of X, all the pairs of respective descendants of A and B
+  // have X as the common root.
+  computeCommonRootsHelper(root_joint_, common_joint_roots_, joint_model_vector_.size());
+  
+  for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
+  {
+    // the common root of a joint and itself is the same joint:
+    common_joint_roots_[joint_model_vector_[i]->getJointIndex() * (1 + joint_model_vector_.size())] = joint_model_vector_[i]->getJointIndex();
+    
+    // a node N and one of its descendants have as common root the node N itself:
+    const std::vector<const JointModel*> &d = joint_model_vector_[i]->getDescendantJointModels();
+    for (std::size_t j = 0 ; j < d.size() ; ++j)
+      common_joint_roots_[d[j]->getJointIndex() * joint_model_vector_.size() + joint_model_vector_[i]->getJointIndex()] = 
+        common_joint_roots_[d[j]->getJointIndex() + joint_model_vector_[i]->getJointIndex() * joint_model_vector_.size()] = joint_model_vector_[i]->getJointIndex();
+  }  
+}
+
+void moveit::core::RobotModel::computeDescendants()
+{
+  // compute the list of descendants for all joints
+  std::vector<const JointModel*> dummy;
+  computeDescendantsHelper(root_joint_, dummy);
+}
 
 void moveit::core::RobotModel::buildJointInfo()
 {
+  moveit::tools::Profiler::ScopedStart prof_start;
+  moveit::tools::Profiler::ScopedBlock prof_block("RobotModel::buildJointInfo");
+
   // construct additional maps for easy access by name
   variable_count_ = 0;
   variable_bounds_.clear();
   joint_model_start_index_.resize(joint_model_vector_.size(), -1);
+  active_variable_names_.reserve(joint_model_vector_.size());
+  joints_of_variable_.reserve(joint_model_vector_.size());
   
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
   {
+    joint_model_vector_[i]->setJointIndex(i);
     const std::vector<std::string> &name_order = joint_model_vector_[i]->getVariableNames();
     for (std::size_t j = 0 ; j < name_order.size() ; ++j)
       variable_bounds_[name_order[j]] = joint_model_vector_[i]->getVariableBounds(name_order[j]);
@@ -214,7 +275,6 @@ void moveit::core::RobotModel::buildJointInfo()
         }
         joint_model_start_index_[i] = variable_count_;
         joint_model_vector_[i]->setFirstVariableIndex(variable_count_);
-        joint_model_vector_[i]->setJointIndex(i);
         joint_variables_index_map_[joint_model_vector_[i]->getName()] = variable_count_;
 
         // compute variable count
@@ -237,14 +297,9 @@ void moveit::core::RobotModel::buildJointInfo()
         }
     }
   }
-  
-  // compute the list of descendants for all joints
-  std::vector<const JointModel*> dummy;
-  computeDescendantsHelper(root_joint_, dummy);
-  
-  // compute common roots for all pairs of joints
-  common_joint_roots_.resize(joint_model_vector_.size() * joint_model_vector_.size(), 0);
-  computeCommonRoots(root_joint_, common_joint_roots_, joint_model_vector_.size());
+
+  computeDescendants();
+  computeCommonRoots(); // must be called _after_ list of descendants was computed
 }
 
 void moveit::core::RobotModel::buildGroupStates(const srdf::Model &srdf_model)
@@ -754,6 +809,7 @@ static inline moveit::core::VariableBounds jointBoundsFromURDF(const urdf::Joint
     b.min_velocity_ = -b.max_velocity_;
     b.velocity_bounded_ = b.max_velocity_ > std::numeric_limits<double>::epsilon();
   }
+  return b;
 }
 }
 
@@ -1218,35 +1274,30 @@ void moveit::core::RobotModel::setKinematicsAllocators(const std::map<std::strin
 
 void moveit::core::RobotModel::printModelInfo(std::ostream &out) const
 {
-  out << "Model " << model_name_ << " in frame " << model_frame_ << ", of dimension " << getVariableCount() << std::endl;
+  out << "Model " << model_name_ << " in frame " << model_frame_ << ", using " << getVariableCount() << " variables" << std::endl;
 
   std::ios_base::fmtflags old_flags = out.flags();
   out.setf(std::ios::fixed, std::ios::floatfield);
   std::streamsize old_prec = out.precision();
   out.precision(5);
-  out << "Joint values bounds: " << std::endl;
-  for (unsigned int i = 0 ; i < joint_model_vector_.size() ; ++i)
+  out << "Joints: " << std::endl;
+  for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
   {
+    out << " '" << joint_model_vector_[i]->getName() << "' (" << joint_model_vector_[i]->getTypeName() << ")" << std::endl;
+    out << "  * Kinematic Tree Index: " << joint_model_vector_[i]->getTreeIndex() << std::endl;
+    out << "  * Joint Index: " << joint_model_vector_[i]->getJointIndex() << std::endl;
     const std::vector<std::string> &vn = joint_model_vector_[i]->getVariableNames();
+    out << "  * " << vn.size() << (vn.size() > 1 ? " variables:" : (vn.empty() ? " variables" : " variable:")) << std::endl;
+    int idx = joint_model_vector_[i]->getFirstVariableIndex();
     for (std::vector<std::string>::const_iterator it = vn.begin() ; it != vn.end() ; ++it)
     {
-      out << "   " << *it << " [";
-      const VariableBounds &b = joint_model_vector_[i]->getVariableBounds(*it);
-      if (b.min_position_ <= -std::numeric_limits<double>::max())
-        out << "DBL_MIN";
-      else
-        out << b.min_position_;
-      out << ", ";
-      if (b.max_position_ >= std::numeric_limits<double>::max())
-        out << "DBL_MAX";
-      else
-        out << b.max_position_;
-      out << "]";
+      out << "     * '" << *it << "', index " << idx++ << " in full state";
       if (joint_model_vector_[i]->getMimic())
-        out << " *";
+        out << ", mimic '" << joint_model_vector_[i]->getMimic()->getName() << "'";
       if (joint_model_vector_[i]->isPassive())
-        out << " +";
+        out << ", passive";
       out << std::endl;
+      out << "        " << joint_model_vector_[i]->getVariableBounds(*it) << std::endl;
     }
   }
   out << std::endl;

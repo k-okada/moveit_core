@@ -66,7 +66,6 @@ moveit::core::PlanarJointModel::PlanarJointModel(const std::string& name)
   variable_bounds_[2].min_position_ = -boost::math::constants::pi<double>();
   variable_bounds_[2].max_position_ = boost::math::constants::pi<double>();
   
-  variable_index_.resize(3, 0);
   computeVariableBoundsMsg();  
 }
 

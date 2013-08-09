@@ -39,6 +39,7 @@
 
 #include <string>
 #include <vector>
+#include <iostream>
 #include <boost/container/flat_map.hpp>
 #include <moveit_msgs/JointLimits.h>
 #include <random_numbers/random_numbers.h>
@@ -133,12 +134,6 @@ public:
   /** \brief Get the type of joint as a string */
   std::string getTypeName() const;
 
-  /** \brief The index of this joint when traversing the kinematic tree in depth first fashion */
-  int getTreeIndex() const
-  {
-    return tree_index_;
-  }
-
   /** \brief Get the link that this joint connects to. The
       robot is assumed to start with a joint, so the root
       joint will return a NULL pointer here. */
@@ -162,12 +157,7 @@ public:
   {
     child_link_model_ = link;
   }
-  
-  void setTreeIndex(int index)
-  {
-    tree_index_ = index;
-  }
-  
+    
   /** @name Reason about the variables that make up this joint
       @{ */
 
@@ -198,6 +188,17 @@ public:
     return variable_names_.size();
   }
 
+  /** \brief The index of this joint when traversing the kinematic tree in depth first fashion */
+  int getTreeIndex() const
+  {
+    return tree_index_;
+  }
+
+  void setTreeIndex(int index)
+  {
+    tree_index_ = index;
+  }
+
   int getFirstVariableIndex() const
   {
     return first_variable_index_;
@@ -217,7 +218,7 @@ public:
   {
     joint_index_ = index;
   }
-  
+
   /** @} */
 
   /** @name Functionality specific to computing state values
@@ -423,8 +424,6 @@ protected:
   /** \brief Map from variable names to the corresponding index in variable_names_ (indexing makes sense within the JointModel only) */
   VariableIndexMap                                     variable_index_map_;
 
-  std::vector<int>                                     variable_index_;
-
   /** \brief The link before this joint */
   const LinkModel                                     *parent_link_model_;
 
@@ -464,6 +463,9 @@ protected:
   /** \brief The index assigned to this joint when traversing the kinematic tree in depth first fashion */
   int                                                  tree_index_;
 };
+
+/** \brief Operator overload for printing variable bounds to a stream */
+std::ostream& operator<<(std::ostream &os, const VariableBounds &b);
 
 }
 }

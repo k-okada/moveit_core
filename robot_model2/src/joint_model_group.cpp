@@ -105,6 +105,8 @@ bool jointPrecedes(const JointModel *a, const JointModel *b)
       return true;
     if (p->getType() == JointModel::FIXED)
       p = p->getParentLinkModel() ? p->getParentLinkModel()->getParentJointModel() : NULL;
+    else
+      break;
   }
   
   return false;
