@@ -155,7 +155,19 @@ public:
   {
     return joint_model_names_vector_;
   }
+  
+  /** \brief Get the arra of joints that are active (not fixed, not mimic) in this model */
+  const std::vector<const JointModel*>& getActiveJointModels() const
+  {
+    return active_joint_model_vector_const_;
+  }
 
+  /** \brief Get the arra of joints that are active (not fixed, not mimic) in this model */
+  const std::vector<JointModel*>& getActiveJointModels()
+  {
+    return active_joint_model_vector_;
+  }
+  
   /** \brief Get the array of continuous joints, in the order they appear
       in the robot state. */
   const std::vector<const JointModel*>& getContinuousJointModels() const
@@ -173,6 +185,11 @@ public:
   const JointModel* getJointOfVariable(int variable_index) const
   {
     return joints_of_variable_[variable_index];
+  }
+
+  const JointModel* getJointOfVariable(const std::string &variable) const
+  {
+    return joints_of_variable_[getVariableIndex(variable)];
   }
   
   /** @} */
@@ -325,7 +342,10 @@ public:
   {
     return variable_bounds_;
   }
-
+  
+  /** \brief Get the bounds for a specific variable. Throw an exception of variable is not found. */
+  const VariableBounds& getVariableBounds(const std::string& variable) const;
+  
   /** \brief Get the joint variables index map.
       The state includes all the joint variables that make up the joints the state consists of.
       This map gives the position in the state vector of the group for each of these variables.
@@ -444,6 +464,12 @@ protected:
   /** \brief The vector of joint names that corresponds to joint_model_vector_ */
   std::vector<std::string>                      joint_model_names_vector_;
 
+  /** \brief The vector of joints in the model, in the order they appear in the state vector */
+  std::vector<JointModel*>                      active_joint_model_vector_;
+
+  /** \brief The vector of joints in the model, in the order they appear in the state vector */
+  std::vector<const JointModel*>                active_joint_model_vector_const_;
+
   /** \brief The set of continuous joints this model contains */
   std::vector<const JointModel*>                continuous_joint_model_vector_;
 
@@ -472,7 +498,7 @@ protected:
       Additionaly, it includes the names of the joints and the index for the first variable of that joint. */
   VariableIndexMap                              joint_variables_index_map_;
 
-  std::vector<int>                              joint_model_start_index_;
+  std::vector<int>                              active_joint_model_start_index_;
   
   /** \brief The bounds for all the variables that make up the joints in this model */
   VariableBoundsMap                             variable_bounds_;

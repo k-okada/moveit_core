@@ -188,37 +188,45 @@ public:
     return variable_names_.size();
   }
 
-  /** \brief The index of this joint when traversing the kinematic tree in depth first fashion */
+  /** \brief Get the index of this joint when traversing the kinematic tree in depth first fashion */
   int getTreeIndex() const
   {
     return tree_index_;
   }
 
+  /** \brief Set the index of this joint when traversing the kinematic tree in depth first fashion */
   void setTreeIndex(int index)
   {
     tree_index_ = index;
   }
 
+  /** \brief Get the index of this joint's first variable within the full robot state */
   int getFirstVariableIndex() const
   {
     return first_variable_index_;
   }
   
+  /** \brief Set the index of this joint's first variable within the full robot state */
   void setFirstVariableIndex(int index)
   {
     first_variable_index_ = index;
   }
   
+  /** \brief Get the index of this joint within the robot model */
   int getJointIndex() const
   {
     return joint_index_;
   }
   
+  /** \brief Set the index of this joint within the robot model */
   void setJointIndex(int index)
   {
     joint_index_ = index;
   }
 
+  /** \brief Get the index of the variable within this joint */
+  int getLocalVariableIndex(const std::string &variable) const;
+  
   /** @} */
 
   /** @name Functionality specific to computing state values

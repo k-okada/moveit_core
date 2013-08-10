@@ -101,6 +101,18 @@ public:
   /** \brief Get a joint by its name. Throw an exception if the joint is not part of this group. */
   const LinkModel* getLinkModel(const std::string &link) const;
 
+  /** \brief Get all the joints in this group (including fixed and mimic joints). */
+  const std::vector<const JointModel*>& getJointModels() const
+  {
+    return joint_model_vector_;
+  }
+
+  /** \brief Get the names of the joints in this group. These are the names of the joints returned by getJointModels(). */
+  const std::vector<std::string>& getJointModelNames() const
+  {
+    return joint_model_name_vector_;
+  }
+
   /** \brief Get the active joints in this group (that  have controllable DOF).
       This may not be the complete set of joints (see getFixedJointModels() and getMimicJointModels() ) */
   const std::vector<const JointModel*>& getActiveJointModels() const
@@ -375,9 +387,6 @@ public:
     return attached_end_effector_names_;
   }
   
-  /** \brief Remember this group is a chain */
-  void markAsChain();
-  
   /** \brief Get the extent of the state space (the maximum value distance() can ever report for this group) */
   double getMaximumExtent(void) const;
 
@@ -456,147 +465,156 @@ protected:
   void computeVariableBoundsMsg();
 
   /** \brief Owner model */
-  const RobotModel                                     *parent_model_;
+  const RobotModel                                          *parent_model_;
 
   /** \brief Name of group */
-  std::string                                           name_;
-
-  /** \brief Names of joints in the order they appear in the group state */
-  std::vector<std::string>                              active_joint_model_name_vector_;
+  std::string                                                name_;
 
   /** \brief Joint instances in the order they appear in the group state */
-  std::vector<const JointModel*>                        active_joint_model_vector_;
+  std::vector<const JointModel*>                             joint_model_vector_;
+
+  /** \brief Names of joints in the order they appear in the group state */
+  std::vector<std::string>                                   joint_model_name_vector_;
+
+  /** \brief Active joint instances in the order they appear in the group state */
+  std::vector<const JointModel*>                             active_joint_model_vector_;
+
+  /** \brief Names of active joints in the order they appear in the group state */
+  std::vector<std::string>                                   active_joint_model_name_vector_;
+
+  /** \brief The joints that have no DOF (fixed) */
+  std::vector<const JointModel*>                             fixed_joints_;
+
+  /** \brief Joints that mimic other joints */
+  std::vector<const JointModel*>                             mimic_joints_;
+
+  /** \brief The set of continuous joints this group contains */
+  std::vector<const JointModel*>                             continuous_joint_model_vector_;
+
+  /** \brief The names of the DOF that make up this group (this is just a sequence of joint variable names; not necessarily joint names!) */
+  std::vector<std::string>                                   active_variable_names_;
+
+  /** \brief The names of the DOF that make up this group (this is just a sequence of joint variable names; not necessarily joint names!) */
+  std::set<std::string>                                      active_variable_names_set_;
 
   /** \brief A map from joint names to their instances. This includes all joints in the group. */
   boost::container::flat_map<std::string, const JointModel*> joint_model_map_;
   
   /** \brief The list of active joint models that are roots in this group */
-  std::vector<const JointModel*>                        joint_roots_;
+  std::vector<const JointModel*>                             joint_roots_;
 
   /** \brief The joint that is a common root for all joints in this group (not necessarily part of this group) */
-  const JointModel                                     *common_root_;
+  const JointModel                                          *common_root_;
   
   /** \brief The group includes all the joint variables that make up the joints the group consists of.
       This map gives the position in the state vector of the group for each of these variables.
       Additionaly, it includes the names of the joints and the index for the first variable of that joint. */
-  VariableIndexMap                                      joint_variables_index_map_;
+  VariableIndexMap                                           joint_variables_index_map_;
 
   /** \brief The list of index values this group includes, with respect to a full robot state; this includes mimic joints. */
-  std::vector<int>                                      variable_index_list_;
+  std::vector<int>                                           variable_index_list_;
     
-  /** \brief The joints that have no DOF (fixed) */
-  std::vector<const JointModel*>                        fixed_joints_;
-
-  /** \brief Joints that mimic other joints */
-  std::vector<const JointModel*>                        mimic_joints_;
-
-  /** \brief The set of continuous joints this group contains */
-  std::vector<const JointModel*>                        continuous_joint_model_vector_;
-
-  /** \brief The names of the DOF that make up this group (this is just a sequence of joint variable names; not necessarily joint names!) */
-  std::vector<std::string>                              active_variable_names_;
-
-  /** \brief The names of the DOF that make up this group (this is just a sequence of joint variable names; not necessarily joint names!) */
-  std::set<std::string>                                 active_variable_names_set_;
-
   /** \brief For each active joint model in this group, hold the index at which the corresponding joint state starts in the group state */
-  std::vector<int>                                      active_joint_model_start_index_;
+  std::vector<int>                                           active_joint_model_start_index_;
   
   /** \brief The links that are on the direct lineage between joints
       and joint_roots_, as well as the children of the joint leafs.
       May not be in any particular order */
-  std::vector<const LinkModel*>                         link_model_vector_;
+  std::vector<const LinkModel*>                              link_model_vector_;
 
   /** \brief A map from link names to their instances */
-  boost::container::flat_map<std::string, const LinkModel*> link_model_map_;
+  boost::container::flat_map<std::string, const LinkModel*>  link_model_map_;
 
   /** \brief The names of the links in this group */
-  std::vector<std::string>                              link_model_name_vector_;
+  std::vector<std::string>                                   link_model_name_vector_;
 
-  std::vector<const LinkModel*>                         link_model_with_geometry_vector_;
+  std::vector<const LinkModel*>                              link_model_with_geometry_vector_;
 
   /** \brief The names of the links in this group that also have geometry */
-  std::vector<std::string>                              link_model_with_geometry_name_vector_;
+  std::vector<std::string>                                   link_model_with_geometry_name_vector_;
 
   /** \brief The list of downstream link models in the order they should be updated (may include links that are not in this group) */
-  std::vector<const LinkModel*>                         updated_link_model_vector_;
+  std::vector<const LinkModel*>                              updated_link_model_vector_;
 
   /** \brief The list of downstream link models in the order they should be updated (may include links that are not in this group) */
-  std::set<const LinkModel*>                            updated_link_model_set_;
+  std::set<const LinkModel*>                                 updated_link_model_set_;
 
   /** \brief The list of downstream link names in the order they should be updated (may include links that are not in this group) */
-  std::vector<std::string>                              updated_link_model_name_vector_;
+  std::vector<std::string>                                   updated_link_model_name_vector_;
 
   /** \brief The list of downstream link names in the order they should be updated (may include links that are not in this group) */
-  std::set<std::string>                                 updated_link_model_name_set_;
+  std::set<std::string>                                      updated_link_model_name_set_;
 
   /** \brief The list of downstream link models in the order they should be updated (may include links that are not in this group) */
-  std::vector<const LinkModel*>                         updated_link_model_with_geometry_vector_;
+  std::vector<const LinkModel*>                              updated_link_model_with_geometry_vector_;
 
   /** \brief The list of downstream link models in the order they should be updated (may include links that are not in this group) */
-  std::set<const LinkModel*>                            updated_link_model_with_geometry_set_;
+  std::set<const LinkModel*>                                 updated_link_model_with_geometry_set_;
 
   /** \brief The list of downstream link names in the order they should be updated (may include links that are not in this group) */
-  std::vector<std::string>                              updated_link_model_with_geometry_name_vector_;
+  std::vector<std::string>                                   updated_link_model_with_geometry_name_vector_;
 
   /** \brief The list of downstream link names in the order they should be updated (may include links that are not in this group) */
-  std::set<std::string>                                 updated_link_model_with_geometry_name_set_;
+  std::set<std::string>                                      updated_link_model_with_geometry_name_set_;
 
   /** \brief The number of variables necessary to describe this group of joints */
-  unsigned int                                          variable_count_;
+  unsigned int                                               variable_count_;
 
   /** \brief True if the state of this group is contiguous within the full robot state; this also means that
       the index values in variable_index_list_ are consecutive integers */
-  bool                                                  is_contiguous_index_list_;
+  bool                                                       is_contiguous_index_list_;
 
-  std::vector<moveit_msgs::JointLimits>                 variable_bounds_msg_;
+  std::vector<moveit_msgs::JointLimits>                      variable_bounds_msg_;
   
   /** \brief The set of labelled subgroups that are included in this group */
-  std::vector<std::string>                              subgroup_names_;
+  std::vector<std::string>                                   subgroup_names_;
 
   /** \brief The set of labelled subgroups that are included in this group */
-  boost::container::flat_set<std::string>               subgroup_names_set_;
+  boost::container::flat_set<std::string>                    subgroup_names_set_;
   
   /** \brief If an end-effector is attached to this group, the name of that end-effector is stored in this variable */
-  std::vector<std::string>                              attached_end_effector_names_;
+  std::vector<std::string>                                   attached_end_effector_names_;
 
   /** \brief First: name of the group that is parent to this end-effector group; Second: the link this in the parent group that this group attaches to */
-  std::pair<std::string, std::string>                   end_effector_parent_;
+  std::pair<std::string, std::string>                        end_effector_parent_;
 
   /** \brief The name of the end effector, if this group is an end-effector */
-  std::string                                           end_effector_name_;
+  std::string                                                end_effector_name_;
 
-  bool                                                  is_chain_;
+  bool                                                       is_chain_;
 
-  std::pair<SolverAllocatorFn, SolverAllocatorMapFn>    solver_allocators_;
+  std::pair<SolverAllocatorFn, SolverAllocatorMapFn>         solver_allocators_;
 
-  kinematics::KinematicsBaseConstPtr                    solver_instance_const_;
+  kinematics::KinematicsBaseConstPtr                         solver_instance_const_;
 
-  kinematics::KinematicsBasePtr                         solver_instance_;
+  kinematics::KinematicsBasePtr                              solver_instance_;
 
-  std::vector<unsigned int>                             ik_joint_bijection_;
+  std::vector<unsigned int>                                  ik_joint_bijection_;
 
-  struct MimicUpdate
+  struct GroupMimicUpdate
   {
+    GroupMimicUpdate(int s, int d, double f, double o) : src(s), dest(d), factor(f), offset(o)
+    {
+    }
     int src;
     int dest;
     double factor;
     double offset;
   };
   
-  std::vector<MimicUpdate>                              mimic_update_;
+  std::vector<GroupMimicUpdate>                              group_mimic_update_;
   
-  double                                                default_ik_timeout_;
+  double                                                     default_ik_timeout_;
 
-  unsigned int                                          default_ik_attempts_;
+  unsigned int                                               default_ik_attempts_;
 
-  srdf::Model::Group                                    config_;
+  srdf::Model::Group                                         config_;
   
   /** \brief The set of default states specified for this group in the SRDF */
-  std::map<std::string, std::map<std::string, double> > default_states_;
+  std::map<std::string, std::map<std::string, double> >      default_states_;
 
   /** \brief The names of the default states specified for this group in the SRDF */
-  std::vector<std::string>                              default_states_names_;
+  std::vector<std::string>                                   default_states_names_;
   
 };
 
