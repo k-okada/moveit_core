@@ -123,11 +123,6 @@ public:
     dirtyFK(index);
   }
   
-  const double* getVariablePositions() const
-  {
-    return position_;
-  }  
-  
   const double* getVariablePositions(const std::string &variable) const
   {
     return position_ + robot_model_->getVariableIndex(variable);
@@ -139,6 +134,110 @@ public:
   }
   
   /** @} */
+
+  /** \defgroup setVariableVelocityGroup Setting variable velocity
+   *  @{
+   */
+  
+  void setVariableVelocities(const double *velocity)
+  {
+    // assume everything is in order in terms of array lengths (for efficiency reasons)
+    memcpy(velocity_, velocity, robot_model_->getVariableCount() * sizeof(double));
+  }
+  
+  void setVariableVelocities(const std::vector<double> &velocity)
+  {
+    assert(robot_model_->getVariableCount() <= velocity.size()); // checked only in debug mode
+    setVariableVelocities(&velocity[0]);
+  }
+  
+  void setVariableVelocities(const std::map<std::string, double> &variable_map)
+  {
+    for (std::map<std::string, double>::const_iterator it = variable_map.begin(), end = variable_map.end() ; it != end ; ++it)
+      velocity_[robot_model_->getVariableIndex(it->first)] = it->second;
+  }
+  
+  void setVariableVelocities(const std::vector<std::string>& variable_names, const std::vector<double>& variable_velocity)
+  {
+    assert(variable_names.size() == variable_velocity.size());
+    for (std::size_t i = 0 ; i < variable_names.size() ; ++i)
+      velocity_[robot_model_->getVariableIndex(variable_names[i])] = variable_velocity[i];  
+  }
+  
+  void setVariableVelocity(const std::string &variable, double value)
+  {
+    setVariableVelocity(robot_model_->getVariableIndex(variable), value);
+  }
+  
+  void setVariableVelocity(int index, double value)
+  {
+    velocity_[index] = value;
+  }
+  
+  const double* getVariableVelocity(const std::string &variable) const
+  {
+    return velocity_ + robot_model_->getVariableIndex(variable);
+  }
+  
+  const double* getVariableVelocity(int index) const
+  {
+    return velocity_ + index;
+  }
+  
+  /** @} */
+
+
+  /** \defgroup setVariableAccelerationGroup Setting variable acceleration
+   *  @{
+   */
+  
+  void setVariableAcceleration(const double *acceleration)
+  {
+    // assume everything is in order in terms of array lengths (for efficiency reasons)
+    memcpy(acceleration_, acceleration, robot_model_->getVariableCount() * sizeof(double));
+  }
+  
+  void setVariableAcceleration(const std::vector<double> &acceleration)
+  {
+    assert(robot_model_->getVariableCount() <= acceleration.size()); // checked only in debug mode
+    setVariableAcceleration(&acceleration[0]);
+  }
+  
+  void setVariableAcceleration(const std::map<std::string, double> &variable_map)
+  {
+    for (std::map<std::string, double>::const_iterator it = variable_map.begin(), end = variable_map.end() ; it != end ; ++it)
+      acceleration_[robot_model_->getVariableIndex(it->first)] = it->second;
+  }
+  
+  void setVariableAcceleration(const std::vector<std::string>& variable_names, const std::vector<double>& variable_acceleration)
+  {
+    assert(variable_names.size() == variable_acceleration.size());
+    for (std::size_t i = 0 ; i < variable_names.size() ; ++i)
+      acceleration_[robot_model_->getVariableIndex(variable_names[i])] = variable_acceleration[i];  
+  }
+  
+  void setVariableAcceleration(const std::string &variable, double value)
+  {
+    setVariableAcceleration(robot_model_->getVariableIndex(variable), value);
+  }
+  
+  void setVariableAcceleration(int index, double value)
+  {
+    acceleration_[index] = value;
+  }
+  
+  const double* getVariableAcceleration(const std::string &variable) const
+  {
+    return acceleration_ + robot_model_->getVariableIndex(variable);
+  }
+  
+  const double* getVariableAcceleration(int index) const
+  {
+    return acceleration_ + index;
+  }
+  
+  /** @} */
+
   
   /** \defgroup setJointPositionGroup Getting and setting joint positions
    *  @{
