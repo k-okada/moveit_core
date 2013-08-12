@@ -49,7 +49,7 @@ moveit::core::RobotState::RobotState(const RobotModelConstPtr &robot_model, Allo
   , variable_joint_transforms_(NULL)
   , global_link_transforms_(NULL)
   , global_collision_body_transforms_(NULL)
-  , dirty_fk_(NULL)
+  , dirty_joint_transforms_(NULL)
   , dirty_link_transforms_(NULL)
   , dirty_collision_body_transforms_(NULL)
   , rng_(NULL)
@@ -141,17 +141,17 @@ void moveit::core::RobotState::copyFrom(const RobotState &other)
       allocTransforms();
     
     // if the other state is fully computed, it is worth copying the data
-    if (other.dirty_fk_ == NULL)
+    if (other.dirty_joint_transforms_ == NULL)
     {
       transforms_ = other.transforms_;
-      dirty_fk_ = NULL;
+      dirty_joint_transforms_ = NULL;
       dirty_collision_body_transforms_ = other.dirty_collision_body_transforms_;
       dirty_link_transforms_ = other.dirty_link_transforms_;
     }
     else
     {
       // otherwise, we will just assume everything is dirty and re-compute when needed
-      dirty_fk_ = robot_model_->getRootJoint();
+      dirty_joint_transforms_ = robot_model_->getRootJoint();
       dirty_collision_body_transforms_ = NULL;
       dirty_link_transforms_ = NULL;
     }
@@ -159,7 +159,7 @@ void moveit::core::RobotState::copyFrom(const RobotState &other)
   else
   {
     // no transforms to copy, so everything will become dirty if/when they get allocated.
-    dirty_fk_ = NULL;
+    dirty_joint_transforms_ = NULL;
     dirty_collision_body_transforms_ = NULL;
     dirty_link_transforms_ = NULL;
   }
@@ -318,7 +318,7 @@ void moveit::core::RobotState::copyJointGroupPositions(const JointModelGroup *gr
 
 void moveit::core::RobotState::updateCollisionBodyTransforms()
 {
-  if (dirty_fk_ != NULL)
+  if (dirty_joint_transforms_ != NULL)
   {
     updateJointTransforms();
     updateLinkTransforms();
@@ -344,8 +344,8 @@ void moveit::core::RobotState::updateCollisionBodyTransforms()
 
 void moveit::core::RobotState::updateLinkTransforms()
 {
-  if (dirty_fk_ != NULL)
-    updateJointTransforms(); // resets dirty_fk_, makes sure memory is allocated for transforms
+  if (dirty_joint_transforms_ != NULL)
+    updateJointTransforms(); // resets dirty_joint_transforms_, makes sure memory is allocated for transforms
   if (dirty_link_transforms_ != NULL)
   {
     updateLinkTransformsInternal(dirty_link_transforms_);
@@ -378,19 +378,19 @@ void moveit::core::RobotState::updateLinkTransformsInternal(const JointModel *st
 
 void moveit::core::RobotState::updateJointTransforms()
 {
-  if (dirty_fk_ != NULL)
+  if (dirty_joint_transforms_ != NULL)
   {
-    const std::vector<const JointModel*> &joint_models = dirty_fk_->getDescendantJointModels();
+    const std::vector<const JointModel*> &joint_models = dirty_joint_transforms_->getDescendantJointModels();
     if (dirty_link_transforms_)
-      dirty_link_transforms_ = robot_model_->getCommonRoot(dirty_fk_, dirty_link_transforms_);
+      dirty_link_transforms_ = robot_model_->getCommonRoot(dirty_joint_transforms_, dirty_link_transforms_);
     else
-      dirty_link_transforms_ = dirty_fk_;
+      dirty_link_transforms_ = dirty_joint_transforms_;
     if (!variable_joint_transforms_)
       allocTransforms();
-    int index = dirty_fk_->getJointIndex();
-    int vindex = dirty_fk_->getFirstVariableIndex();
-    dirty_fk_->computeTransform(position_ + vindex, variable_joint_transforms_[index]);
-    dirty_fk_ = NULL;
+    int index = dirty_joint_transforms_->getJointIndex();
+    int vindex = dirty_joint_transforms_->getFirstVariableIndex();
+    dirty_joint_transforms_->computeTransform(position_ + vindex, variable_joint_transforms_[index]);
+    dirty_joint_transforms_ = NULL;
     
     for (std::size_t i = 0 ; i < joint_models.size() ; ++i)
     {
@@ -852,7 +852,7 @@ void moveit::core::RobotState::printStateInfo(std::ostream &out) const
   else
     out << "  * Acceleration: NULL" << std::endl;
   
-  out << "  * Dirty FK: " << (dirty_fk_ ? dirty_fk_->getName() : "NULL") << std::endl;
+  out << "  * Dirty FK: " << (dirty_joint_transforms_ ? dirty_joint_transforms_->getName() : "NULL") << std::endl;
   out << "  * Dirty Link Transforms: " << (dirty_link_transforms_ ? dirty_link_transforms_->getName() : "NULL") << std::endl;
   out << "  * Dirty Collision Body Transforms: " << (dirty_collision_body_transforms_ ? dirty_collision_body_transforms_->getName() : "NULL") << std::endl;
 }

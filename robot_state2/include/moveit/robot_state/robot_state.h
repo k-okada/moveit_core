@@ -108,7 +108,7 @@ public:
     
     // the index of the root joint of the system is 0. Since all joint values have potentially
     // changed, we will need to do FK from the root (if FK is ever required)
-    dirty_fk_ = NULL;
+    dirty_joint_transforms_ = NULL;
   }
   
   void setVariablePositions(const std::vector<double> &position)
@@ -371,7 +371,7 @@ public:
   void setToDefaultValues()
   {
     robot_model_->getVariableDefaultValues(position_);
-    dirty_fk_ = robot_model_->getRootJoint();
+    dirty_joint_transforms_ = robot_model_->getRootJoint();
   }
   
   /** @} */
@@ -395,7 +395,7 @@ public:
   {
     // make sure we do everything from scratch if needed
     if (force)
-      dirty_fk_ = robot_model_->getRootJoint();
+      dirty_joint_transforms_ = robot_model_->getRootJoint();
     // this actually triggers all needed updates
     updateCollisionBodyTransforms();
   }
@@ -658,12 +658,12 @@ private:
   
   void dirtyFK(int index)
   {
-    dirty_fk_ = dirty_fk_ == NULL ? robot_model_->getJointOfVariable(index) : robot_model_->getCommonRoot(dirty_fk_, robot_model_->getJointOfVariable(index));
+    dirty_joint_transforms_ = dirty_joint_transforms_ == NULL ? robot_model_->getJointOfVariable(index) : robot_model_->getCommonRoot(dirty_joint_transforms_, robot_model_->getJointOfVariable(index));
   }
   
   void dirtyFK(const JointModel *joint)
   {
-    dirty_fk_ = dirty_fk_ == NULL ? joint : robot_model_->getCommonRoot(dirty_fk_, joint);
+    dirty_joint_transforms_ = dirty_joint_transforms_ == NULL ? joint : robot_model_->getCommonRoot(dirty_joint_transforms_, joint);
   }
   
   void updateMimicPosition(int index)
@@ -702,7 +702,7 @@ private:
   double                                *velocity_;
   double                                *acceleration_;
   
-  const JointModel                      *dirty_fk_;
+  const JointModel                      *dirty_joint_transforms_;
   const JointModel                      *dirty_link_transforms_;
   const JointModel                      *dirty_collision_body_transforms_;
   
