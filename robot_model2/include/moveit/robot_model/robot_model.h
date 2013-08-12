@@ -290,6 +290,9 @@ public:
   /** \brief Compute the default values for a RobotState */
   void getVariableDefaultValues(std::map<std::string, double> &values) const;
 
+  /** \brief Update the variable values for the state of a group with respect to the mimic joints. */
+  void updateMimicJoints(double *values) const;
+
   /** \defgroup RobotModel_JointGroupModelAccess Access to joint groups
    *  @{
    */

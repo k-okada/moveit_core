@@ -234,17 +234,7 @@ public:
   {
     return updated_link_model_name_set_.find(name) != updated_link_model_name_set_.end();
   }
-
-
-  /** \brief A joint group consists of an array of joints. Each joint has a specific ordering of its variables.
-      Given the ordering of joints the group maintains, an ordering of all the variables of the group can be then constructed.
-      The map from variable names to their position in the joint group state is given by this function */
-  //  const VariableIndexMap& getJointVariablesIndexMap() const
-  //  {
-  //    return joint_variables_index_map_;
-  //  }
-
-
+  
   const std::vector<int>& getVariableIndexList() const
   {
     return variable_index_list_;
@@ -314,6 +304,9 @@ public:
     getVariableRandomValuesNearBy(rng, &values[0], &near[0], distances);
   }  
 
+  /** \brief Update the variable values for the state of a group with respect to the mimic joints. This only updates mimic joints that have the parent in this group. If there is a joint mimicking one that is outside the group, there are no values to be read (\e values is only the group state) */
+  void updateMimicJoints(double *values) const;
+  
   /** \brief Get the number of variables that describe this joint group. This includes variables necessary for mimic joints, so will always be >=
       the number of items returned by getActiveVariableNames() */
   unsigned int getVariableCount() const

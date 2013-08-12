@@ -195,6 +195,14 @@ moveit::core::JointModelGroup::JointModelGroup(const std::string& group_name,
       GroupMimicUpdate mu(src, dest, mimic_joints_[i]->getMimicFactor(), mimic_joints_[i]->getMimicOffset());
       group_mimic_update_.push_back(mu);
     }
+    else
+    {
+      // if the joint mimic is not in the group, we make sure the destination value will be set to 0
+      int src = 0; // it does not matter what we read
+      int dest = joint_variables_index_map_[mimic_joints_[i]->getName()];
+      GroupMimicUpdate mu(src, dest, 0.0, 0.0);
+      group_mimic_update_.push_back(mu);
+    }
   
   // now we need to make another pass for group links (we include the fixed joints here)
   std::set<const LinkModel*> group_links_set;
@@ -314,18 +322,14 @@ void moveit::core::JointModelGroup::getVariableRandomValues(random_numbers::Rand
   for (std::size_t i = 0 ; i < active_joint_model_vector_.size() ; ++i)
     active_joint_model_vector_[i]->getVariableRandomValues(rng, values + active_joint_model_start_index_[i]);
 
-  // update mimic (only local joints as we are dealing with a local group state)
-  for (std::size_t i = 0 ; i < group_mimic_update_.size() ; ++i)
-    values[group_mimic_update_[i].dest] = values[group_mimic_update_[i].src] * group_mimic_update_[i].factor + group_mimic_update_[i].offset;
+  updateMimicJoints(values);
 }
 
 void moveit::core::JointModelGroup::getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const double *near, double distance) const
 {
   for (std::size_t i = 0 ; i < active_joint_model_vector_.size() ; ++i)
     active_joint_model_vector_[i]->getVariableRandomValuesNearBy(rng, values + active_joint_model_start_index_[i], near + active_joint_model_start_index_[i], distance);
-  // update mimic (only local joints as we are dealing with a local group state)
-  for (std::size_t i = 0 ; i < group_mimic_update_.size() ; ++i)
-    values[group_mimic_update_[i].dest] = values[group_mimic_update_[i].src] * group_mimic_update_[i].factor + group_mimic_update_[i].offset;
+  updateMimicJoints(values);
 }
 
 void moveit::core::JointModelGroup::getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const double *near, const std::map<JointModel::JointType, double> &distance_map) const
@@ -340,9 +344,7 @@ void moveit::core::JointModelGroup::getVariableRandomValuesNearBy(random_numbers
       logWarn("Did not pass in distance for '%s'", active_joint_model_vector_[i]->getName().c_str());
     active_joint_model_vector_[i]->getVariableRandomValuesNearBy(rng, values + active_joint_model_start_index_[i], near + active_joint_model_start_index_[i], distance);
   }
-  // update mimic (only local joints as we are dealing with a local group state)
-  for (std::size_t i = 0 ; i < group_mimic_update_.size() ; ++i)
-    values[group_mimic_update_[i].dest] = values[group_mimic_update_[i].src] * group_mimic_update_[i].factor + group_mimic_update_[i].offset;
+  updateMimicJoints(values);
 }
 
 void moveit::core::JointModelGroup::getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const double *near, const std::vector<double> &distances) const
@@ -353,6 +355,11 @@ void moveit::core::JointModelGroup::getVariableRandomValuesNearBy(random_numbers
                     boost::lexical_cast<std::string>(distances.size()));  
   for (std::size_t i = 0 ; i < active_joint_model_vector_.size() ; ++i)
     active_joint_model_vector_[i]->getVariableRandomValuesNearBy(rng, values + active_joint_model_start_index_[i], near + active_joint_model_start_index_[i], distances[i]);
+  updateMimicJoints(values);
+}
+
+void moveit::core::JointModelGroup::updateMimicJoints(double *values) const
+{
   // update mimic (only local joints as we are dealing with a local group state)
   for (std::size_t i = 0 ; i < group_mimic_update_.size() ; ++i)
     values[group_mimic_update_[i].dest] = values[group_mimic_update_[i].src] * group_mimic_update_[i].factor + group_mimic_update_[i].offset;
@@ -385,9 +392,7 @@ void moveit::core::JointModelGroup::getVariableDefaultValues(double *values) con
 {
   for (std::size_t i = 0 ; i < active_joint_model_vector_.size() ; ++i)
     active_joint_model_vector_[i]->getVariableDefaultValues(values + active_joint_model_start_index_[i]);
-  // update mimic (only local joints as we are dealing with a local group state)
-  for (std::size_t i = 0 ; i < group_mimic_update_.size() ; ++i)
-    values[group_mimic_update_[i].dest] = values[group_mimic_update_[i].src] * group_mimic_update_[i].factor + group_mimic_update_[i].offset;
+  updateMimicJoints(values);
 }
 
 void moveit::core::JointModelGroup::getVariableDefaultValues(std::map<std::string, double> &values) const

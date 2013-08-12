@@ -1070,16 +1070,21 @@ moveit::core::LinkModel* moveit::core::RobotModel::getLinkModel(const std::strin
   return NULL;
 }
 
-void moveit::core::RobotModel::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, double *values) const
+void moveit::core::RobotModel::updateMimicJoints(double *values) const
 {
-  for (std::size_t i = 0 ; i < active_joint_model_vector_.size() ; ++i)
-    active_joint_model_vector_[i]->getVariableRandomValues(rng, values + active_joint_model_start_index_[i]);
   for (std::size_t i = 0 ; i < mimic_joints_.size() ; ++i)
   {
     int src = mimic_joints_[i]->getMimic()->getFirstVariableIndex();
     int dest = mimic_joints_[i]->getFirstVariableIndex();
     values[dest] = values[src] * mimic_joints_[i]->getMimicFactor() + mimic_joints_[i]->getMimicOffset();
   }
+}
+
+void moveit::core::RobotModel::getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, double *values) const
+{
+  for (std::size_t i = 0 ; i < active_joint_model_vector_.size() ; ++i)
+    active_joint_model_vector_[i]->getVariableRandomValues(rng, values + active_joint_model_start_index_[i]);
+  updateMimicJoints(values);
 }
 
 const moveit::core::VariableBounds& moveit::core::RobotModel::getVariableBounds(const std::string& variable) const
@@ -1103,12 +1108,7 @@ void moveit::core::RobotModel::getVariableDefaultValues(double *values) const
 {
   for (std::size_t i = 0 ; i < active_joint_model_vector_.size() ; ++i)
     active_joint_model_vector_[i]->getVariableDefaultValues(values + active_joint_model_start_index_[i]);
-  for (std::size_t i = 0 ; i < mimic_joints_.size() ; ++i)
-  {
-    int src = mimic_joints_[i]->getMimic()->getFirstVariableIndex();
-    int dest = mimic_joints_[i]->getFirstVariableIndex();
-    values[dest] = values[src] * mimic_joints_[i]->getMimicFactor() + mimic_joints_[i]->getMimicOffset();
-  }
+  updateMimicJoints(values);
 }
 
 void moveit::core::RobotModel::getVariableDefaultValues(std::map<std::string, double> &values) const

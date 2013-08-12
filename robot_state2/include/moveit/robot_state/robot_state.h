@@ -480,50 +480,72 @@ public:
   {
     return distance(other.getVariablePositions());
   }
+  double distance(const double *state_position) const;
+
+  double distance(const RobotState &other, const JointModelGroup *joint_group) const;
+  double distance(const double *joint_group_position, const JointModelGroup *joint_group) const;
   
   double distance(const RobotState &other, const JointModel *joint) const
   {
     return distance(other.getJointPositions(joint), joint);
   }
+  double distance(const double *joint_position, const JointModel *joint) const
+  {
+    return joint->distance(joint_position, position_ + joint->getFirstVariableIndex());
+  }
   
-  double distance(const RobotState &other, const JointModelGroup *joint_group) const;
   
-  double distance(const double *state_position) const;
-  double distance(const double *joint_position, const JointModel *joint) const;  
-  double distance(const double *joint_group_position, const JointModelGroup *joint_group) const;
-  
-  void interpolate(const RobotState &to, double t, RobotState &state)
+  /** \brief Interpolate from this state towards state \e to, at time \e t in [0,1]. 
+      The result is stored in \e state, mimic joints are correctly updated and flags are set 
+      so that FK is recomputed when needed. */
+  void interpolate(const RobotState &to, double t, RobotState &state) const
   {
     interpolate(to.getVariablePositions(), t, state.getVariablePositions());
+    state.dirtyFK(robot_model_->getRootJoint());
   }
-  
-  void interpolate(const RobotState &to, double t, RobotState &state, const JointModel *joint)
+
+  /** \brief Interpolate from this state towards state \e to, at time \e t in [0,1].  The result is stored in \e state,
+      mimic joints are correctly updated. This call has no effect of any transformation matrices.*/
+  void interpolate(const double *to, double t, double *state) const;
+
+  /** \brief Update \e state by interpolating form this state towards \e to, at time \e t in [0,1] but only for 
+      the joint \e joint. If there are joints that mimic this joint, they are updated. Flags are set so that
+      FK computation is triggered as needed. */
+  void interpolate(const RobotState &to, double t, RobotState &state, const JointModel *joint) const
   {
     interpolate(to.getJointPositions(joint), t, const_cast<double*>(state.getJointPositions(joint)), joint);
+    state.updateMimicJoint(joint);
+    state.dirtyFK(joint);
+  }
+  /** \brief Interpolate the variable values for a single joint. No mimic joints are updated since we only have access to
+      the memory for one individual joint. */
+  void interpolate(const double *to, double t, double *state, const JointModel *joint) const
+  {
+    joint->interpolate(position_ + joint->getFirstVariableIndex(), to, t, state);
   }
   
-  void interpolate(const RobotState &to, double t, RobotState &state, const JointModelGroup *joint_group);
+  /** \brief Interpolate from this state towards \e to, at time \e t in [0,1], but only for the joints in the
+      specified group. If mimic joints need to be updated, they are updated accordingly. Flags are set so that FK
+      computation is triggered when needed. */
+  void interpolate(const RobotState &to, double t, RobotState &state, const JointModelGroup *joint_group) const;
   
-  void interpolate(const double *to, double t, double *state);
-  void interpolate(const double *to, double t, double *state, const JointModel *joint);
-  void interpolate(const double *to, double t, double *state, const JointModelGroup *joint_group);
-  
+
+  void interpolate(const double *to, double t, double *state, const JointModelGroup *joint_group) const;
+    
   void enforceBounds();
+  void enforceBounds(const JointModelGroup *joint_group);
   void enforceBounds(const JointModel *joint)
   {
     if (joint->enforceBounds(position_ + joint->getFirstVariableIndex()))
       updateMimicJoint(joint);
   }
   
-  void enforceBounds(const JointModelGroup *joint_group);
-  
   bool satisfiesBounds(double margin = 0.0) const;
+  bool satisfiesBounds(const JointModelGroup *joint_group, double margin = 0.0) const;
   bool satisfiesBounds(const JointModel *joint, double margin = 0.0) const
   {
     return joint->satisfiesBounds(getJointPositions(joint), margin);
   }
-  
-  bool satisfiesBounds(const JointModelGroup *joint_group, double margin = 0.0) const;
   
   /** @} */
   
@@ -673,28 +695,28 @@ private:
   void getStateTreeJointString(std::ostream& ss, const JointModel* jm, const std::string& pfx0, bool last) const;
   void printTransform(const Eigen::Affine3d &transform, std::ostream &out) const;
   
-  RobotModelConstPtr        robot_model_;
-  int                       called_new_for_;
+  RobotModelConstPtr                     robot_model_;
+  int                                    called_new_for_;
   
-  double                   *position_;
-  double                   *velocity_;
-  double                   *acceleration_;
+  double                                *position_;
+  double                                *velocity_;
+  double                                *acceleration_;
   
-  const JointModel         *dirty_fk_;
-  const JointModel         *dirty_link_transforms_;
-  const JointModel         *dirty_collision_body_transforms_;
+  const JointModel                      *dirty_fk_;
+  const JointModel                      *dirty_link_transforms_;
+  const JointModel                      *dirty_collision_body_transforms_;
   
-  EigenSTL::vector_Affine3d transforms_;
-  Eigen::Affine3d          *variable_joint_transforms_; // this points to an element in transforms_, so it is aligned 
-  Eigen::Affine3d          *global_link_transforms_;  // this points to an element in transforms_, so it is aligned 
-  Eigen::Affine3d          *global_collision_body_transforms_;  // this points to an element in transforms_, so it is aligned 
+  EigenSTL::vector_Affine3d              transforms_;
+  Eigen::Affine3d                       *variable_joint_transforms_; // this points to an element in transforms_, so it is aligned 
+  Eigen::Affine3d                       *global_link_transforms_;  // this points to an element in transforms_, so it is aligned 
+  Eigen::Affine3d                       *global_collision_body_transforms_;  // this points to an element in transforms_, so it is aligned 
   
   /** \brief The attached bodies that are part of this state (from all links) */
-  std::map<std::string, AttachedBody*> attached_body_map_;
+  std::map<std::string, AttachedBody*>   attached_body_map_;
 
   /** \brief This event is called when there is a change in the attached bodies for this state;
       The event specifies the body that changed and whether it was just attached or about to be detached. */
-  AttachedBodyCallback                 attached_body_update_callback_;
+  AttachedBodyCallback                   attached_body_update_callback_;
 
   
   /** \brief For certain operations a state needs a random number generator. However, it may be slightly expensive
