@@ -172,6 +172,7 @@ void moveit::core::RobotState::copyFrom(const RobotState &other)
   else
   {
     // we allocate all the memory we need in one block
+    called_new_for_ = ALLOC_POSITION;
     std::size_t vc = robot_model_->getVariableCount();
     position_ = new double[(1 + (other.velocity_ ? 1 : 0) + (other.acceleration_ ? 1 : 0)) * vc];
     std::size_t c = vc * sizeof(double);
@@ -234,6 +235,7 @@ void moveit::core::RobotState::setVariablePositions(const std::vector<std::strin
 
 void moveit::core::RobotState::setVariableVelocities(const std::map<std::string, double> &variable_map)
 {
+  allocVelocity();
   for (std::map<std::string, double>::const_iterator it = variable_map.begin(), end = variable_map.end() ; it != end ; ++it)
     velocity_[robot_model_->getVariableIndex(it->first)] = it->second;
 }
@@ -247,12 +249,14 @@ void moveit::core::RobotState::setVariableVelocities(const std::map<std::string,
 void moveit::core::RobotState::setVariableVelocities(const std::vector<std::string>& variable_names, const std::vector<double>& variable_velocity)
 {
   assert(variable_names.size() == variable_velocity.size());
+  allocVelocity();
   for (std::size_t i = 0 ; i < variable_names.size() ; ++i)
     velocity_[robot_model_->getVariableIndex(variable_names[i])] = variable_velocity[i];  
 }
 
 void moveit::core::RobotState::setVariableAccelerations(const std::map<std::string, double> &variable_map)
 {
+  allocAcceleration();
   for (std::map<std::string, double>::const_iterator it = variable_map.begin(), end = variable_map.end() ; it != end ; ++it)
     acceleration_[robot_model_->getVariableIndex(it->first)] = it->second;
 }
@@ -266,6 +270,7 @@ void moveit::core::RobotState::setVariableAccelerations(const std::map<std::stri
 void moveit::core::RobotState::setVariableAccelerations(const std::vector<std::string>& variable_names, const std::vector<double>& variable_acceleration)
 {
   assert(variable_names.size() == variable_acceleration.size());
+  allocAcceleration();
   for (std::size_t i = 0 ; i < variable_names.size() ; ++i)
     acceleration_[robot_model_->getVariableIndex(variable_names[i])] = variable_acceleration[i];  
 }
@@ -373,4 +378,58 @@ void moveit::core::RobotState::updateJointTransforms()
       joint_models[i]->computeTransform(position_ + vindex, variable_joint_transforms_[index]);
     }
   }
+}
+
+void moveit::core::RobotState::printStateInfo(std::ostream &out) const
+{
+  out << "Robot State @" << this << std::endl;
+  out << "  * Memory is available for" << (position_ ? " position" : "")
+      << (velocity_ ? " velocity" : "") <<  (acceleration_ ? " acceleration" : "")
+      << (variable_joint_transforms_ ? " transforms" : "") << std::endl;
+  out << "  * Called new[] for" << (position_ ? " position" : "")
+      << (called_new_for_ & ALLOC_VELOCITY ? " velocity" : "")
+      << (called_new_for_ & ALLOC_ACCELERATION ? " acceleration" : "")
+      << (transforms_.size() > 0 ? " transforms" : "") << std::endl;
+  
+  std::size_t n = robot_model_->getVariableCount();
+  if (position_)
+  {
+    out << "  * Position: ";
+    for (std::size_t i = 0 ; i < n ; ++i)
+      out << position_[i] << " ";
+    out << std::endl;
+  }
+  else
+    out << "  * Position: NULL" << std::endl;
+  
+  if (velocity_)
+  {
+    out << "  * Velocity: ";
+    for (std::size_t i = 0 ; i < n ; ++i)
+      out << velocity_[i] << " ";
+    out << std::endl;
+  }
+  else
+    out << "  * Velocity: NULL" << std::endl;
+
+  if (acceleration_)
+  {
+    out << "  * Acceleration: ";
+    for (std::size_t i = 0 ; i < n ; ++i)
+      out << acceleration_[i] << " ";
+    out << std::endl;
+  }
+  else
+    out << "  * Acceleration: NULL" << std::endl;
+  
+  out << "  * Dirty FK: " << (dirty_fk_ ? dirty_fk_->getName() : "NULL") << std::endl;
+  out << "  * Dirty Link Transforms: " << (dirty_link_transforms_ ? dirty_link_transforms_->getName() : "NULL") << std::endl;
+  out << "  * Dirty Collision Body Transforms: " << (dirty_collision_body_transforms_ ? dirty_collision_body_transforms_->getName() : "NULL") << std::endl;
+}
+
+void moveit::core::RobotState::printTransform(const Eigen::Affine3d &transform, std::ostream &out) const
+{
+  Eigen::Quaterniond q(transform.rotation());  
+  out << "T.xyz = [" << transform.translation().x() << ", " << transform.translation().y() << ", " << transform.translation().z() << "], Q.xyzw = ["
+      << q.x() << ", " << q.y() << ", " << q.z() << ", " << q.w() << "]" << std::endl;
 }

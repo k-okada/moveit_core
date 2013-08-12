@@ -90,8 +90,11 @@ TEST_F(LoadPlanningModelsPr2, Model)
   {
     ASSERT_EQ(joints[i]->getJointIndex(), i);
     ASSERT_EQ(robot_model->getJointModel(joints[i]->getName()), joints[i]);
-    //    std::cout << joints[i]->getName() << std::endl;
-    
+    std::cout << joints[i]->getName() << " ";    
+    const std::vector<const moveit::core::LinkModel*> &d = joints[i]->getDescendantLinkModels();
+    for (std::size_t j = 0 ; j < d.size() ; ++j)
+      std::cout << d[j]->getLinkIndex() << " ";
+    std::cout << std::endl;
   }
   const std::vector<const moveit::core::LinkModel*> &links = robot_model->getLinkModels();
   for (std::size_t i = 0 ; i < links.size() ; ++i)

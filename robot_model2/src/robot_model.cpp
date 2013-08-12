@@ -42,28 +42,9 @@
 #include <limits>
 #include <queue>
 #include <cmath>
+#include "order_robot_model_items.inc"
 
 /* ------------------------ RobotModel ------------------------ */
-
-
-namespace moveit
-{
-namespace core
-{
-namespace
-{
-
-struct OrderGroupsByName
-{
-  bool operator()(const JointModelGroup *a, const JointModelGroup *b) const
-  {
-    return a->getName() < b->getName();
-  }
-};
-
-}
-}
-}
 
 moveit::core::RobotModel::RobotModel(const boost::shared_ptr<const urdf::ModelInterface> &urdf_model,
                                      const boost::shared_ptr<const srdf::Model> &srdf_model)
@@ -149,28 +130,32 @@ namespace core
 {
 namespace 
 {
-void computeDescendantsHelper(const JointModel *joint, std::vector<const JointModel*> &parents)
+
+typedef std::map<const JointModel*, std::pair<std::set<const LinkModel*, OrderLinksByIndex>, std::set<const JointModel*, OrderJointsByIndex> > > DescMap;
+
+void computeDescendantsHelper(const JointModel *joint, std::vector<const JointModel*> &parents, DescMap &descendants)
 {
   if (!joint)
     return;
   
   for (std::size_t i = 0 ; i < parents.size() ; ++i)
-    const_cast<JointModel*>(parents[i])->addDescendantJoint(joint);
+    descendants[parents[i]].second.insert(joint);
   
   const LinkModel *lm = joint->getChildLinkModel();
   if (!lm)
     return;
   
   for (std::size_t i = 0 ; i < parents.size() ; ++i)
-    const_cast<JointModel*>(parents[i])->addDescendantLink(lm);
+    descendants[parents[i]].first.insert(lm);
+  descendants[joint].first.insert(lm);
   
   parents.push_back(joint);
   const std::vector<const JointModel*> &ch = lm->getChildJointModels();
   for (std::size_t i = 0 ; i < ch.size() ; ++i)
-    computeDescendantsHelper(ch[i], parents);
+    computeDescendantsHelper(ch[i], parents, descendants);
   const std::vector<const JointModel*> &mim = joint->getMimicRequests();
   for (std::size_t i = 0 ; i < mim.size() ; ++i)
-    computeDescendantsHelper(mim[i], parents);
+    computeDescendantsHelper(mim[i], parents, descendants);
   parents.pop_back();
 }
 
@@ -240,8 +225,17 @@ void moveit::core::RobotModel::computeCommonRoots()
 void moveit::core::RobotModel::computeDescendants()
 {
   // compute the list of descendants for all joints
-  std::vector<const JointModel*> dummy;
-  computeDescendantsHelper(root_joint_, dummy);
+  std::vector<const JointModel*> parents;
+  DescMap descendants;
+  computeDescendantsHelper(root_joint_, parents, descendants);
+  for (DescMap::iterator it = descendants.begin() ; it != descendants.end() ; ++it)
+  {
+    JointModel *jm = const_cast<JointModel*>(it->first);
+    for (std::set<const JointModel*>::const_iterator jt = it->second.second.begin() ; jt != it->second.second.end() ; ++jt)
+      jm->addDescendantJointModel(*jt);
+    for (std::set<const LinkModel*>::const_iterator jt = it->second.first.begin() ; jt != it->second.first.end() ; ++jt)
+      jm->addDescendantLinkModel(*jt);
+  }
 }
 
 void moveit::core::RobotModel::buildJointInfo()

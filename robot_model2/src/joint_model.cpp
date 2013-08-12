@@ -150,12 +150,12 @@ void moveit::core::JointModel::addMimicRequest(const JointModel *joint)
   mimic_requests_.push_back(joint);
 }
 
-void moveit::core::JointModel::addDescendantJoint(const JointModel *joint)
+void moveit::core::JointModel::addDescendantJointModel(const JointModel *joint)
 {
   descendant_joint_models_.push_back(joint);    
 }
 
-void moveit::core::JointModel::addDescendantLink(const LinkModel *link)
+void moveit::core::JointModel::addDescendantLinkModel(const LinkModel *link)
 {
   descendant_link_models_.push_back(link);
 }

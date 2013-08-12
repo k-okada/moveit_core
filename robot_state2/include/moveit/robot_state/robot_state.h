@@ -143,6 +143,7 @@ public:
 
   double* getVariableVelocities()
   {
+    allocVelocity();
     return velocity_;
   }
   
@@ -153,6 +154,7 @@ public:
   
   void setVariableVelocities(const double *velocity)
   {
+    allocVelocity();
     // assume everything is in order in terms of array lengths (for efficiency reasons)
     memcpy(velocity_, velocity, robot_model_->getVariableCount() * sizeof(double));
   }
@@ -174,6 +176,7 @@ public:
   
   void setVariableVelocity(int index, double value)
   {
+    allocVelocity();
     velocity_[index] = value;
   }
   
@@ -196,6 +199,7 @@ public:
 
   double* getVariableAccelerations()
   {
+    allocAcceleration();
     return acceleration_;
   }
   
@@ -206,6 +210,7 @@ public:
   
   void setVariableAccelerations(const double *acceleration)
   {
+    allocAcceleration();
     // assume everything is in order in terms of array lengths (for efficiency reasons)
     memcpy(acceleration_, acceleration, robot_model_->getVariableCount() * sizeof(double));
   }
@@ -220,13 +225,14 @@ public:
   void setVariableAccelerations(const std::map<std::string, double> &variable_map, std::vector<std::string>& missing_variables);
   void setVariableAccelerations(const std::vector<std::string>& variable_names, const std::vector<double>& variable_acceleration);
   
-  void setVariableAccelerations(const std::string &variable, double value)
+  void setVariableAcceleration(const std::string &variable, double value)
   {
     setVariableAcceleration(robot_model_->getVariableIndex(variable), value);
   }
   
   void setVariableAcceleration(int index, double value)
   {
+    allocAcceleration();
     acceleration_[index] = value;
   }
   
@@ -504,6 +510,8 @@ public:
   /** \brief Check if an attached body named \e id exists in this group */
   //  bool hasAttachedBody(const std::string &id) const;
   /** @} */
+
+  void printStateInfo(std::ostream &out) const;
   
 private:
 
@@ -539,6 +547,7 @@ private:
   }
 
   void getMissingKeys(const std::map<std::string, double> &variable_map, std::vector<std::string> &missing_variables) const;
+  void printTransform(const Eigen::Affine3d &transform, std::ostream &out) const;
   
   RobotModelConstPtr        robot_model_;
   int                       called_new_for_;

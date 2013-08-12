@@ -346,8 +346,8 @@ public:
 
   /** \brief Notify this joint that there is another joint that mimics it */
   void addMimicRequest(const JointModel *joint);
-  void addDescendantJoint(const JointModel *joint);
-  void addDescendantLink(const LinkModel *link);
+  void addDescendantJointModel(const JointModel *joint);
+  void addDescendantLinkModel(const LinkModel *link);
 
   /** \brief Get all the link models that descend from this joint, in the kinematic tree */
   const std::vector<const LinkModel*>& getDescendantLinkModels() const

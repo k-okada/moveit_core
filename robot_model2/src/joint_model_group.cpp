@@ -41,6 +41,7 @@
 #include <console_bridge/console.h>
 #include <boost/lexical_cast.hpp>
 #include <algorithm>
+#include "order_robot_model_items.inc"
 
 namespace moveit
 {
@@ -48,22 +49,6 @@ namespace core
 {
 namespace
 {
-
-struct OrderLinksByIndex
-{
-  bool operator()(const LinkModel *a, const LinkModel *b) const
-  {
-    return a->getLinkIndex() < b->getLinkIndex();
-  }
-};
-
-struct OrderJointsByIndex
-{
-  bool operator()(const JointModel *a, const JointModel *b) const
-  {
-    return a->getJointIndex() < b->getJointIndex();
-  }
-};
   
 // check if a parent or ancestor of joint is included in this group
 bool includesParent(const JointModel *joint, const JointModelGroup *group)
