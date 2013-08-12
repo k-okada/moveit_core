@@ -40,6 +40,7 @@
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_state/attached_body.h>
 #include <sensor_msgs/JointState.h>
+#include <visualization_msgs/MarkerArray.h>
 
 namespace moveit
 {
@@ -68,7 +69,12 @@ public:
   RobotState(const RobotState &other);
 
   RobotState& operator=(const RobotState &other);
-  
+
+  const RobotModelConstPtr& getRobotModel() const
+  {
+    return robot_model_;
+  }
+   
   std::size_t getVariableCount() const
   {
     return robot_model_->getVariableCount();
@@ -385,12 +391,24 @@ public:
   void updateJointTransforms();
 
   /** \brief Update all transforms. */
-  void update()
+  void update(bool force = false)
   {
+    // make sure we do everything from scratch if needed
+    if (force)
+      dirty_fk_ = robot_model_->getRootJoint();
     // this actually triggers all needed updates
     updateCollisionBodyTransforms();
   }
   
+  /** \brief Update the state after setting a particular link to the input global transform pose.*/
+  void updateStateWithLinkAt(const std::string& link_name, const Eigen::Affine3d& transform, bool backward = false)
+  {
+    updateStateWithLinkAt(robot_model_->getLinkModel(link_name), transform, backward);
+  }
+
+  /** \brief Update the state after setting a particular link to the input global transform pose.*/
+  void updateStateWithLinkAt(const LinkModel *link, const Eigen::Affine3d& transform, bool backward = false);
+
   const Eigen::Affine3d& getGlobalLinkTransform(const std::string &link_name)
   {
     return getGlobalLinkTransform(robot_model_->getLinkModel(link_name));
@@ -571,9 +589,42 @@ public:
 
   /** \brief Check if an attached body named \e id exists in this state */
   bool hasAttachedBody(const std::string &id) const;
+
+  void setAttachedBodyUpdateCallback(const AttachedBodyCallback &callback);
   /** @} */
 
+
+  const Eigen::Affine3d& getFrameTransform(const std::string &id);
+  const Eigen::Affine3d& getFrameTransform(const std::string &id) const;
+  bool knowsFrameTransform(const std::string &id) const;
+  
+  /** @brief Get a MarkerArray that fully describes the robot markers for a given robot.
+   *  @param arr The returned marker array
+   *  @param link_names The list of link names for which the markers should be created.
+   *  @param color The color for the marker
+   *  @param ns The namespace for the markers
+   *  @param dur The ros::Duration for which the markers should stay visible
+   */
+  void getRobotMarkers(visualization_msgs::MarkerArray& arr,
+                       const std::vector<std::string> &link_names,
+                       const std_msgs::ColorRGBA& color,
+                       const std::string& ns,
+                       const ros::Duration& dur,
+                       bool include_attached = false) const;
+  
+  /** @brief Get a MarkerArray that fully describes the robot markers for a given robot.
+   *  @param arr The returned marker array
+   *  @param link_names The list of link names for which the markers should be created.
+   */
+  void getRobotMarkers(visualization_msgs::MarkerArray& arr,
+                       const std::vector<std::string> &link_names,
+                       bool include_attached = false) const;
+
   void printStateInfo(std::ostream &out) const;
+  
+  void printTransforms(std::ostream &out) const;
+  
+  std::string getStateTreeString(const std::string& prefix = "") const;
   
 private:
 
@@ -608,6 +659,8 @@ private:
       position_[mim[i]->getFirstVariableIndex()] =  mim[i]->getMimicFactor() * v + mim[i]->getMimicOffset();
   }
   
+  void updateLinkTransformsInternal(const JointModel *start);
+  
   /** \brief Return the instance of a random number generator */
   random_numbers::RandomNumberGenerator& getRandomNumberGenerator()
   {
@@ -617,6 +670,7 @@ private:
   }
   
   void getMissingKeys(const std::map<std::string, double> &variable_map, std::vector<std::string> &missing_variables) const;
+  void getStateTreeJointString(std::ostream& ss, const JointModel* jm, const std::string& pfx0, bool last) const;
   void printTransform(const Eigen::Affine3d &transform, std::ostream &out) const;
   
   RobotModelConstPtr        robot_model_;
