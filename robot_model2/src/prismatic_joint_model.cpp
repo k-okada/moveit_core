@@ -89,13 +89,20 @@ void moveit::core::PrismaticJointModel::getVariableRandomValuesNearBy(random_num
                               std::min(bounds[0].max_position_, near[0] + distance));
 }
 
-void moveit::core::PrismaticJointModel::enforceBounds(double *values, const Bounds &bounds) const
+bool moveit::core::PrismaticJointModel::enforceBounds(double *values, const Bounds &bounds) const
 {
   if (values[0] < bounds[0].min_position_)
+  {
     values[0] = bounds[0].min_position_;
+    return true;
+  }
   else
     if (values[0] > bounds[0].max_position_)
+    {
       values[0] = bounds[0].max_position_;
+      return true;
+    }
+  return false;
 }
 
 double moveit::core::PrismaticJointModel::distance(const double *values1, const double *values2) const

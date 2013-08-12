@@ -62,6 +62,7 @@ unsigned int moveit::core::RevoluteJointModel::getStateSpaceDimension() const
 
 void moveit::core::RevoluteJointModel::setContinuous(bool flag)
 {
+  continuous_ = flag;
   if (flag)
   {
     variable_bounds_[0].position_bounded_ = false;
@@ -144,33 +145,42 @@ double moveit::core::RevoluteJointModel::distance(const double *values1, const d
 
 bool moveit::core::RevoluteJointModel::satisfiesBounds(const double *values, const Bounds &bounds, double margin) const
 {
-  if (continuous_)
-    return true;
   if (values[0] < bounds[0].min_position_ - margin || values[0] > bounds[0].max_position_ + margin)
     return false;
   return true;
 }
 
-void moveit::core::RevoluteJointModel::enforceBounds(double *values, const Bounds &bounds) const
+bool moveit::core::RevoluteJointModel::enforceBounds(double *values, const Bounds &bounds) const
 {
   if (continuous_)
   {
     double &v = values[0];
-    v = fmod(v, 2.0 * boost::math::constants::pi<double>());
-    if (v < -boost::math::constants::pi<double>())
-      v += 2.0 * boost::math::constants::pi<double>();
-    else
-      if (v > boost::math::constants::pi<double>())
-        v -= 2.0 * boost::math::constants::pi<double>();
+    if (v <= -boost::math::constants::pi<double>() || v > boost::math::constants::pi<double>())
+    {
+      v = fmod(v, 2.0 * boost::math::constants::pi<double>());
+      if (v <= -boost::math::constants::pi<double>())
+        v += 2.0 * boost::math::constants::pi<double>();
+      else
+        if (v > boost::math::constants::pi<double>())
+          v -= 2.0 * boost::math::constants::pi<double>();
+      return true;
+    }
   }
   else
   {
     if (values[0] < bounds[0].min_position_)
+    {
       values[0] = bounds[0].min_position_;
+      return true;
+    }
     else
       if (values[0] > bounds[0].max_position_)
+      {
         values[0] = bounds[0].max_position_;
+        return true;
+      }
   }
+  return false;
 }
 
 void moveit::core::RevoluteJointModel::computeTransform(const double *joint_values, Eigen::Affine3d &transf) const

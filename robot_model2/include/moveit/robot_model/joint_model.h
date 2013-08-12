@@ -267,14 +267,15 @@ public:
   /** \brief Check if the set of values for the variables of this joint are within bounds, up to some margin. */
   virtual bool satisfiesBounds(const double *values, const Bounds &other_bounds, double margin) const = 0;
 
-  /** \brief Force the specified values to be inside bounds and normalized. Quaternions are normalized, continuous joints are made between -Pi and Pi. */
-  void enforceBounds(double *values) const
+  /** \brief Force the specified values to be inside bounds and normalized. Quaternions are normalized, continuous joints are made between -Pi and Pi.
+      Returns true if changes were made. */
+  bool enforceBounds(double *values) const
   {
-    enforceBounds(values, variable_bounds_);
+    return enforceBounds(values, variable_bounds_);
   }
 
   /** \brief Force the specified values to be inside bounds and normalized. Quaternions are normalized, continuous joints are made between -Pi and Pi. */
-  virtual void enforceBounds(double *values, const Bounds &other_bounds) const = 0;
+  virtual bool enforceBounds(double *values, const Bounds &other_bounds) const = 0;
 
   /** \brief Get the bounds for a variable. Throw an exception if the variable was not found */
   const VariableBounds& getVariableBounds(const std::string& variable) const;

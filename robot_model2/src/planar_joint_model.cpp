@@ -184,17 +184,24 @@ bool moveit::core::PlanarJointModel::normalizeRotation(double *values) const
   return true;
 }
 
-void moveit::core::PlanarJointModel::enforceBounds(double *values, const Bounds &bounds) const
+bool moveit::core::PlanarJointModel::enforceBounds(double *values, const Bounds &bounds) const
 {
-  normalizeRotation(values);
+  bool result = normalizeRotation(values);
   for (unsigned int i = 0 ; i < 2 ; ++i)
   {
     if (values[i] < bounds[i].min_position_)
+    {
       values[i] = bounds[i].min_position_;
+      result = true;
+    }
     else
       if (values[i] > bounds[i].max_position_)
+      {
         values[i] = bounds[i].max_position_;
+        result = true;
+      }
   }
+  return result;
 }
 
 void moveit::core::PlanarJointModel::computeTransform(const double *joint_values, Eigen::Affine3d &transf) const

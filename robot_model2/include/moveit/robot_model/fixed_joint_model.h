@@ -54,7 +54,7 @@ public:
   virtual void getVariableRandomValues(random_numbers::RandomNumberGenerator &rng, double *values, const Bounds &other_bounds) const;
   virtual void getVariableRandomValuesNearBy(random_numbers::RandomNumberGenerator &rng, double *values, const Bounds &other_bounds,
                                              const double *near, const double distance) const;
-  virtual void enforceBounds(double *values, const Bounds &other_bounds) const;
+  virtual bool enforceBounds(double *values, const Bounds &other_bounds) const;
   virtual bool satisfiesBounds(const double *values, const Bounds &other_bounds, double margin) const;
 
   virtual void interpolate(const double *from, const double *to, const double t, double *state) const;

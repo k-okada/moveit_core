@@ -380,6 +380,35 @@ void moveit::core::RobotState::updateJointTransforms()
   }
 }
 
+bool moveit::core::RobotState::satisfiesBounds(double margin) const
+{
+  const std::vector<const JointModel*> &jm = robot_model_->getJointModels();
+  for (std::size_t i = 0 ; i < jm.size() ; ++i)
+    if (!satisfiesBounds(jm[i], margin))
+    {
+      std::cout << jm[i]->getName() << std::endl;
+      return false;
+    }
+  
+  return true;
+}
+
+void moveit::core::RobotState::enforceBounds()
+{
+  const std::vector<const JointModel*> &jm = robot_model_->getJointModels();
+  for (std::size_t i = 0 ; i < jm.size() ; ++i)
+  {
+    std::cout << jm[i]->getName() << std::endl;
+    
+    enforceBounds(jm[i]);
+  }
+  
+}
+
+void moveit::core::RobotState::enforceBounds(const JointModelGroup *joint_group)
+{
+}
+
 void moveit::core::RobotState::printStateInfo(std::ostream &out) const
 {
   out << "Robot State @" << this << std::endl;

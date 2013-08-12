@@ -117,8 +117,6 @@ void moveit::core::RobotModel::buildModel(const urdf::ModelInterface &urdf_model
     std::stringstream ss;
     printModelInfo(ss);
     logDebug("%s", ss.str().c_str());
-    std::cout << ss.str() << std::endl;
-    
   }
   else
     logWarn("No root link found");

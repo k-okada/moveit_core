@@ -59,8 +59,9 @@ void moveit::core::FixedJointModel::getVariableRandomValuesNearBy(random_numbers
 {
 }
 
-void moveit::core::FixedJointModel::enforceBounds(double *values, const Bounds &bounds) const
+bool moveit::core::FixedJointModel::enforceBounds(double *values, const Bounds &bounds) const
 {
+  return false;
 }
 
 bool moveit::core::FixedJointModel::satisfiesBounds(const double *values, const Bounds &bounds, double margin) const

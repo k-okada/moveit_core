@@ -193,17 +193,24 @@ unsigned int moveit::core::FloatingJointModel::getStateSpaceDimension() const
   return 6;
 }
 
-void moveit::core::FloatingJointModel::enforceBounds(double *values, const Bounds &bounds) const
+bool moveit::core::FloatingJointModel::enforceBounds(double *values, const Bounds &bounds) const
 {
-  normalizeRotation(values);
+  bool result = normalizeRotation(values);
   for (unsigned int i = 0 ; i < 3 ; ++i)
   {
     if (values[i] < bounds[i].min_position_)
+    {
       values[i] = bounds[i].min_position_;
+      result = true;
+    }
     else
       if (values[i] > bounds[i].max_position_)
+      {
         values[i] = bounds[i].max_position_;
+        result = true;
+      }
   }
+  return result;
 }
 
 void moveit::core::FloatingJointModel::computeTransform(const double *joint_values, Eigen::Affine3d &transf) const

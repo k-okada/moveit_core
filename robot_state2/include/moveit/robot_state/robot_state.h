@@ -322,7 +322,7 @@ public:
   }
   
   void setJointGroupPositions(const JointModelGroup *group, const double *gstate);
-  
+
   void copyJointGroupPositions(const std::string &joint_group_name, std::vector<double> &gstate) const
   {
     const JointModelGroup *jmg = robot_model_->getJointModelGroup(joint_group_name);
@@ -489,11 +489,20 @@ public:
   void interpolate(const double *to, double t, double *state, const JointModelGroup *joint_group);
   
   void enforceBounds();
-  void enforceBounds(const JointModel *joint);
+  void enforceBounds(const JointModel *joint)
+  {
+    if (joint->enforceBounds(position_ + joint->getFirstVariableIndex()))
+      updateMimicJoint(joint);
+  }
+  
   void enforceBounds(const JointModelGroup *joint_group);
   
   bool satisfiesBounds(double margin = 0.0) const;
-  bool satisfiesBounds(const JointModel *joint, double margin = 0.0) const;
+  bool satisfiesBounds(const JointModel *joint, double margin = 0.0) const
+  {
+    return joint->satisfiesBounds(getJointPositions(joint), margin);
+  }
+  
   bool satisfiesBounds(const JointModelGroup *joint_group, double margin = 0.0) const;
   
   /** @} */
