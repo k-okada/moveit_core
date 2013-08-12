@@ -37,36 +37,33 @@
 #ifndef MOVEIT_ROBOT_STATE_ATTACHED_BODY_
 #define MOVEIT_ROBOT_STATE_ATTACHED_BODY_
 
-#include <moveit/robot_state/link_state.h>
+#include <moveit/robot_model/link_model.h>
 #include <eigen_stl_containers/eigen_stl_containers.h>
 #include <sensor_msgs/JointState.h>
 #include <set>
 
-namespace robot_state
+namespace moveit
 {
-
-class LinkState;
+namespace core
+{
 
 /** @brief Object defining bodies that can be attached to robot
  *  links. This is useful when handling objects picked up by
  *  the robot. */
 class AttachedBody
 {
-  friend class RobotState;
 public:
-
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
+  
   /** \brief Construct an attached body for a specified \e link. The name of this body is \e id and it consists of \e shapes that
       attach to the link by the transforms \e attach_trans. The set of links that are allowed to be touched by this object is specified by \e touch_links. */
-  AttachedBody(const robot_model::LinkModel *link, const std::string &id,
+  AttachedBody(const LinkModel *link, const std::string &id,
                const std::vector<shapes::ShapeConstPtr> &shapes,
                const EigenSTL::vector_Affine3d &attach_trans,
                const std::set<std::string> &touch_links,
                const sensor_msgs::JointState &attach_posture);
-
+  
   ~AttachedBody();
-
+  
   /** \brief Get the name of the attached body */
   const std::string& getName() const
   {
@@ -80,7 +77,7 @@ public:
   }
 
   /** \brief Get the model of the link this body is attached to */
-  const robot_model::LinkModel* getAttachedLink() const
+  const LinkModel* getAttachedLink() const
   {
     return parent_link_model_;
   }
@@ -124,12 +121,16 @@ public:
   void setScale(double scale);
 
   /** \brief Recompute global_collision_body_transform given the transform of the parent link*/
-  void computeTransform(const Eigen::Affine3d &parent_link_global_transform);
-
+  void computeTransform(const Eigen::Affine3d &parent_link_global_transform)
+  {
+    for (std::size_t i = 0; i < global_collision_body_transforms_.size() ; ++i)
+      global_collision_body_transforms_[i] = parent_link_global_transform * attach_trans_[i];
+  }
+  
 private:
 
   /** \brief The link that owns this attached body */
-  const robot_model::LinkModel      *parent_link_model_;
+  const LinkModel                   *parent_link_model_;
 
   /** \brief string id for reference */
   std::string                        id_;
@@ -152,4 +153,6 @@ private:
 };
 
 }
+}
+
 #endif

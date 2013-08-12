@@ -101,6 +101,7 @@ void moveit::core::RobotModel::buildModel(const urdf::ModelInterface &urdf_model
 
   root_joint_ = NULL;
   root_link_ = NULL;
+  link_geometry_count_ = 0;
   model_name_ = urdf_model.getName();
   logInform("Loading robot model '%s'...", model_name_.c_str());
   
@@ -108,7 +109,7 @@ void moveit::core::RobotModel::buildModel(const urdf::ModelInterface &urdf_model
   {
     const urdf::Link *root_link_ptr = urdf_model.getRoot().get();
     model_frame_ = '/' + root_link_ptr->name;
-
+    
     logInform("... building kinematic chain"); 
     root_joint_ = buildRecursive(NULL, root_link_ptr, srdf_model);
     if (root_joint_)
@@ -252,7 +253,7 @@ void moveit::core::RobotModel::buildJointInfo()
   variable_count_ = 0;
   variable_bounds_.clear();
   active_joint_model_start_index_.reserve(joint_model_vector_.size());
-  active_variable_names_.reserve(joint_model_vector_.size());
+  variable_names_.reserve(joint_model_vector_.size());
   joints_of_variable_.reserve(joint_model_vector_.size());
   
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
@@ -268,7 +269,7 @@ void moveit::core::RobotModel::buildJointInfo()
       for (std::size_t j = 0; j < name_order.size(); ++j)
       {
         joint_variables_index_map_[name_order[j]] = variable_count_ + j;
-        active_variable_names_.push_back(name_order[j]);
+        variable_names_.push_back(name_order[j]);
         joints_of_variable_.push_back(joint_model_vector_[i]);
       }
       if (joint_model_vector_[i]->getMimic() == NULL)
@@ -744,7 +745,7 @@ moveit::core::JointModel* moveit::core::RobotModel::buildRecursive(LinkModel *pa
   
   // bookkeeping for the joint
   joint_model_map_[joint->getName()] = joint;
-  joint->setTreeIndex(joint_model_vector_.size());
+  joint->setJointIndex(joint_model_vector_.size());
   joint_model_vector_.push_back(joint);
   joint_model_vector_const_.push_back(joint);
   joint_model_names_vector_.push_back(joint->getName());
@@ -756,7 +757,8 @@ moveit::core::JointModel* moveit::core::RobotModel::buildRecursive(LinkModel *pa
 
   // bookkeeping for the link
   link_model_map_[joint->getChildLinkModel()->getName()] = link;
-  link->setTreeIndex(link_model_vector_.size());
+  link->setLinkTransformIndex(link_model_vector_.size());
+  link->setLinkIndex(link_model_vector_.size());
   link_model_vector_.push_back(link);
   link_model_vector_const_.push_back(link);
   link_model_names_vector_.push_back(link->getName());
@@ -764,6 +766,8 @@ moveit::core::JointModel* moveit::core::RobotModel::buildRecursive(LinkModel *pa
   {
     link_models_with_collision_geometry_vector_.push_back(link);
     link_model_names_with_collision_geometry_vector_.push_back(link->getName());
+    link->setFirstCollisionBodyTransformIndex(link_geometry_count_);
+    link_geometry_count_ += link->getShapes().size();
   }
   link->setParentJointModel(joint);
 
@@ -959,7 +963,7 @@ moveit::core::LinkModel* moveit::core::RobotModel::constructLinkModel(const urdf
         }
       }
   }
-  
+
   result->setGeometry(shapes, poses);
   
   // figure out visual mesh (try visual urdf tag first, collision tag otherwise
@@ -1099,8 +1103,8 @@ void moveit::core::RobotModel::getVariableRandomValues(random_numbers::RandomNum
   std::vector<double> tmp(variable_count_);
   getVariableRandomValues(rng, &tmp[0]);
   values.clear();
-  for (std::size_t i = 0 ; i < active_variable_names_.size() ; ++i)
-    values[active_variable_names_[i]] = tmp[i];
+  for (std::size_t i = 0 ; i < variable_names_.size() ; ++i)
+    values[variable_names_[i]] = tmp[i];
 }
 
 void moveit::core::RobotModel::getVariableDefaultValues(double *values) const
@@ -1120,8 +1124,8 @@ void moveit::core::RobotModel::getVariableDefaultValues(std::map<std::string, do
   std::vector<double> tmp(variable_count_);
   getVariableDefaultValues(&tmp[0]);
   values.clear();
-  for (std::size_t i = 0 ; i < active_variable_names_.size() ; ++i)
-    values[active_variable_names_[i]] = tmp[i];
+  for (std::size_t i = 0 ; i < variable_names_.size() ; ++i)
+    values[variable_names_[i]] = tmp[i];
 }
 
 int moveit::core::RobotModel::getVariableIndex(const std::string &variable) const
@@ -1200,7 +1204,6 @@ void moveit::core::RobotModel::printModelInfo(std::ostream &out) const
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
   {
     out << " '" << joint_model_vector_[i]->getName() << "' (" << joint_model_vector_[i]->getTypeName() << ")" << std::endl;
-    out << "  * Kinematic Tree Index: " << joint_model_vector_[i]->getTreeIndex() << std::endl;
     out << "  * Joint Index: " << joint_model_vector_[i]->getJointIndex() << std::endl;
     const std::vector<std::string> &vn = joint_model_vector_[i]->getVariableNames();
     out << "  * " << vn.size() << (vn.size() > 1 ? " variables:" : (vn.empty() ? " variables" : " variable:")) << std::endl;

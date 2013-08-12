@@ -53,7 +53,7 @@ struct OrderLinksByIndex
 {
   bool operator()(const LinkModel *a, const LinkModel *b) const
   {
-    return a->getTreeIndex() < b->getTreeIndex();
+    return a->getLinkIndex() < b->getLinkIndex();
   }
 };
 
@@ -61,7 +61,7 @@ struct OrderJointsByIndex
 {
   bool operator()(const JointModel *a, const JointModel *b) const
   {
-    return a->getTreeIndex() < b->getTreeIndex();
+    return a->getJointIndex() < b->getJointIndex();
   }
 };
   
@@ -151,14 +151,14 @@ moveit::core::JointModelGroup::JointModelGroup(const std::string& group_name,
         active_joint_model_vector_.push_back(joint_model_vector_[i]);
         active_joint_model_name_vector_.push_back(joint_model_vector_[i]->getName());
         active_joint_model_start_index_.push_back(variable_count_);
-        for (std::size_t j = 0; j < name_order.size(); ++j)
-        {
-          active_variable_names_.push_back(name_order[j]);
-          active_variable_names_set_.insert(name_order[j]);
-        }
       }
       else
         mimic_joints_.push_back(joint_model_vector_[i]);
+      for (std::size_t j = 0; j < name_order.size(); ++j)
+      {
+        variable_names_.push_back(name_order[j]);
+        variable_names_set_.insert(name_order[j]);
+      }
       
       int first_index = joint_model_vector_[i]->getFirstVariableIndex();
       for (std::size_t j = 0; j < name_order.size(); ++j)
@@ -409,8 +409,8 @@ void moveit::core::JointModelGroup::getVariableDefaultValues(std::map<std::strin
 {
   std::vector<double> tmp(variable_count_);
   getVariableDefaultValues(&tmp[0]);
-  for (std::size_t i = 0 ; i < active_variable_names_.size() ; ++i)
-    values[active_variable_names_[i]] = tmp[i];
+  for (std::size_t i = 0 ; i < variable_names_.size() ; ++i)
+    values[variable_names_[i]] = tmp[i];
 }
 
 void moveit::core::JointModelGroup::computeVariableBoundsMsg()
@@ -516,17 +516,17 @@ void moveit::core::JointModelGroup::printGroupInfo(std::ostream &out) const
   out << "  * Joints:" << std::endl;
   for (std::size_t i = 0 ; i < joint_model_vector_.size() ; ++i)
     out << "    '" << joint_model_vector_[i]->getName() << "' (" << joint_model_vector_[i]->getTypeName() << ")" << std::endl;
-  out << "  * Active Variables:" << std::endl;
-  for (std::size_t i = 0 ; i < active_variable_names_.size() ; ++i)
+  out << "  * Variables:" << std::endl;
+  for (std::size_t i = 0 ; i < variable_names_.size() ; ++i)
   {
-    int local_idx = joint_variables_index_map_.find(active_variable_names_[i])->second;
-    const JointModel *jm = parent_model_->getJointOfVariable(active_variable_names_[i]);
-    out << "    '" << active_variable_names_[i] << "', index " << (jm->getFirstVariableIndex() + jm->getLocalVariableIndex(active_variable_names_[i]))
+    int local_idx = joint_variables_index_map_.find(variable_names_[i])->second;
+    const JointModel *jm = parent_model_->getJointOfVariable(variable_names_[i]);
+    out << "    '" << variable_names_[i] << "', index " << (jm->getFirstVariableIndex() + jm->getLocalVariableIndex(variable_names_[i]))
         << " in full state, index " << local_idx << " in group state";
     if (jm->getMimic())
       out << ", mimic '" << jm->getMimic()->getName() << "'";
     out << std::endl;
-    out << "        " << parent_model_->getVariableBounds(active_variable_names_[i]) << std::endl;
+    out << "        " << parent_model_->getVariableBounds(variable_names_[i]) << std::endl;
   }
   out << "  * Variables Index List:" << std::endl;
   out << "    ";

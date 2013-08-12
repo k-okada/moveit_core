@@ -188,18 +188,6 @@ public:
     return variable_names_.size();
   }
 
-  /** \brief Get the index of this joint when traversing the kinematic tree in depth first fashion */
-  int getTreeIndex() const
-  {
-    return tree_index_;
-  }
-
-  /** \brief Set the index of this joint when traversing the kinematic tree in depth first fashion */
-  void setTreeIndex(int index)
-  {
-    tree_index_ = index;
-  }
-
   /** \brief Get the index of this joint's first variable within the full robot state */
   int getFirstVariableIndex() const
   {
@@ -468,8 +456,6 @@ protected:
   /** \brief Index for this joint in the array of joints of the complete model */
   int                                                  joint_index_;
   
-  /** \brief The index assigned to this joint when traversing the kinematic tree in depth first fashion */
-  int                                                  tree_index_;
 };
 
 /** \brief Operator overload for printing variable bounds to a stream */

@@ -38,8 +38,8 @@
 #define MOVEIT_CORE_ROBOT_STATE_
 
 #include <moveit/robot_model/robot_model.h>
+#include <moveit/robot_state/attached_body.h>
 #include <sensor_msgs/JointState.h>
-//#include <moveit/robot_state/attached_body.h>
 
 namespace moveit
 {
@@ -66,10 +66,30 @@ public:
   ~RobotState();
   
   RobotState(const RobotState &other);
+
+  std::size_t getVariableCount() const
+  {
+    return robot_model_->getVariableCount();
+  }
   
-  /** \defgroup setVariablePositionGroup Setting variable position
+  const std::vector<std::string>& getVariableNames() const
+  {
+    return robot_model_->getVariableNames();
+  }
+  
+  /** \defgroup setVariablePosition_Fn Getting and setting variable position
    *  @{
    */
+
+  double* getVariablePositions()
+  {
+    return position_;
+  }
+  
+  const double* getVariablePositions() const
+  {
+    return position_;
+  }
   
   void setVariablePositions(const double *position)
   {
@@ -89,27 +109,9 @@ public:
     setVariablePositions(&position[0]);
   }
   
-  void setVariablePositions(const std::map<std::string, double> &variable_map)
-  {
-    for (std::map<std::string, double>::const_iterator it = variable_map.begin(), end = variable_map.end() ; it != end ; ++it)
-    {
-      int index = robot_model_->getVariableIndex(it->first);
-      position_[index] = it->second;
-      updateMimicPosition(index);
-      dirtyFK(index);
-    }
-  }
-  
-  void setVariablePositions(const std::vector<std::string>& variable_names, const std::vector<double>& variable_position)
-  {
-    for (std::size_t i = 0 ; i < variable_names.size() ; ++i)
-    { 
-      int index = robot_model_->getVariableIndex(variable_names[i]);
-      position_[index] = variable_position[i];  
-      updateMimicPosition(index);
-      dirtyFK(index);
-    }
-  }
+  void setVariablePositions(const std::map<std::string, double> &variable_map);
+  void setVariablePositions(const std::map<std::string, double> &variable_map, std::vector<std::string> &missing_variables);
+  void setVariablePositions(const std::vector<std::string>& variable_names, const std::vector<double>& variable_position);
   
   void setVariablePosition(const std::string &variable, double value)
   {
@@ -123,21 +125,31 @@ public:
     dirtyFK(index);
   }
   
-  const double* getVariablePositions(const std::string &variable) const
+  const double getVariablePosition(const std::string &variable) const
   {
-    return position_ + robot_model_->getVariableIndex(variable);
+    return position_[robot_model_->getVariableIndex(variable)];
   }
   
-  const double* getVariablePositions(int index) const
+  const double getVariablePosition(int index) const
   {
-    return position_ + index;
+    return position_[index];
   }
   
   /** @} */
 
-  /** \defgroup setVariableVelocityGroup Setting variable velocity
+  /** \defgroup setVariableVelocity_Fn Getting and setting variable velocity
    *  @{
    */
+
+  double* getVariableVelocities()
+  {
+    return velocity_;
+  }
+  
+  const double* getVariableVelocities() const
+  {
+    return velocity_;
+  }
   
   void setVariableVelocities(const double *velocity)
   {
@@ -151,18 +163,9 @@ public:
     setVariableVelocities(&velocity[0]);
   }
   
-  void setVariableVelocities(const std::map<std::string, double> &variable_map)
-  {
-    for (std::map<std::string, double>::const_iterator it = variable_map.begin(), end = variable_map.end() ; it != end ; ++it)
-      velocity_[robot_model_->getVariableIndex(it->first)] = it->second;
-  }
-  
-  void setVariableVelocities(const std::vector<std::string>& variable_names, const std::vector<double>& variable_velocity)
-  {
-    assert(variable_names.size() == variable_velocity.size());
-    for (std::size_t i = 0 ; i < variable_names.size() ; ++i)
-      velocity_[robot_model_->getVariableIndex(variable_names[i])] = variable_velocity[i];  
-  }
+  void setVariableVelocities(const std::map<std::string, double> &variable_map);
+  void setVariableVelocities(const std::map<std::string, double> &variable_map, std::vector<std::string>& missing_variables);
+  void setVariableVelocities(const std::vector<std::string>& variable_names, const std::vector<double>& variable_velocity);
   
   void setVariableVelocity(const std::string &variable, double value)
   {
@@ -174,49 +177,50 @@ public:
     velocity_[index] = value;
   }
   
-  const double* getVariableVelocity(const std::string &variable) const
+  const double getVariableVelocity(const std::string &variable) const
   {
-    return velocity_ + robot_model_->getVariableIndex(variable);
+    return velocity_[robot_model_->getVariableIndex(variable)];
   }
   
-  const double* getVariableVelocity(int index) const
+  const double getVariableVelocity(int index) const
   {
-    return velocity_ + index;
+    return velocity_[index];
   }
   
   /** @} */
 
 
-  /** \defgroup setVariableAccelerationGroup Setting variable acceleration
+  /** \defgroup setVariableAcceleration_Fn Getting and setting variable acceleration
    *  @{
    */
+
+  double* getVariableAccelerations()
+  {
+    return acceleration_;
+  }
   
-  void setVariableAcceleration(const double *acceleration)
+  const double* getVariableAccelerations() const
+  {
+    return acceleration_;
+  }
+  
+  void setVariableAccelerations(const double *acceleration)
   {
     // assume everything is in order in terms of array lengths (for efficiency reasons)
     memcpy(acceleration_, acceleration, robot_model_->getVariableCount() * sizeof(double));
   }
   
-  void setVariableAcceleration(const std::vector<double> &acceleration)
+  void setVariableAccelerations(const std::vector<double> &acceleration)
   {
     assert(robot_model_->getVariableCount() <= acceleration.size()); // checked only in debug mode
-    setVariableAcceleration(&acceleration[0]);
+    setVariableAccelerations(&acceleration[0]);
   }
   
-  void setVariableAcceleration(const std::map<std::string, double> &variable_map)
-  {
-    for (std::map<std::string, double>::const_iterator it = variable_map.begin(), end = variable_map.end() ; it != end ; ++it)
-      acceleration_[robot_model_->getVariableIndex(it->first)] = it->second;
-  }
+  void setVariableAccelerations(const std::map<std::string, double> &variable_map);
+  void setVariableAccelerations(const std::map<std::string, double> &variable_map, std::vector<std::string>& missing_variables);
+  void setVariableAccelerations(const std::vector<std::string>& variable_names, const std::vector<double>& variable_acceleration);
   
-  void setVariableAcceleration(const std::vector<std::string>& variable_names, const std::vector<double>& variable_acceleration)
-  {
-    assert(variable_names.size() == variable_acceleration.size());
-    for (std::size_t i = 0 ; i < variable_names.size() ; ++i)
-      acceleration_[robot_model_->getVariableIndex(variable_names[i])] = variable_acceleration[i];  
-  }
-  
-  void setVariableAcceleration(const std::string &variable, double value)
+  void setVariableAccelerations(const std::string &variable, double value)
   {
     setVariableAcceleration(robot_model_->getVariableIndex(variable), value);
   }
@@ -226,20 +230,20 @@ public:
     acceleration_[index] = value;
   }
   
-  const double* getVariableAcceleration(const std::string &variable) const
+  const double getVariableAcceleration(const std::string &variable) const
   {
-    return acceleration_ + robot_model_->getVariableIndex(variable);
+    return acceleration_[robot_model_->getVariableIndex(variable)];
   }
   
-  const double* getVariableAcceleration(int index) const
+  const double getVariableAcceleration(int index) const
   {
-    return acceleration_ + index;
+    return acceleration_[index];
   }
   
   /** @} */
 
   
-  /** \defgroup setJointPositionGroup Getting and setting joint positions
+  /** \defgroup setJointPosition_Fn Getting and setting joint positions
    *  @{
    */
   void setJointPositions(const std::string &joint_name, const double *position)
@@ -288,7 +292,7 @@ public:
   /** @} */
   
   
-  /** \defgroup setGroupPositionGroup Getting and setting group positions
+  /** \defgroup setGroupPosition_Fn Getting and setting group positions
    *  @{
    */
   
@@ -311,21 +315,7 @@ public:
     setJointGroupPositions(group, &gstate[0]);
   }
   
-  void setJointGroupPositions(const JointModelGroup *group, const double *gstate)
-  {
-    const std::vector<int> &il = group->getVariableIndexList();
-    if (group->isContiguousWithinState())
-      memcpy(position_ + il[0], gstate, group->getVariableCount() * sizeof(double));
-    else
-    {
-      for (std::size_t i = 0 ; i < il.size() ; ++i)
-        position_[il[i]] = gstate[i];
-    }
-    const std::vector<const JointModel*> &mimic = group->getMimicJointModels();
-    for (std::size_t i = 0 ; i < mimic.size() ; ++i)
-      updateMimicJoint(mimic[i]);
-    dirtyFK(group->getCommonRoot());
-  }
+  void setJointGroupPositions(const JointModelGroup *group, const double *gstate);
   
   void copyJointGroupPositions(const std::string &joint_group_name, std::vector<double> &gstate) const
   {
@@ -350,19 +340,13 @@ public:
     copyJointGroupPositions(group, &gstate[0]);
   }
   
-  void copyJointGroupPositions(const JointModelGroup *group, double *gstate) const
-  {
-    const std::vector<int> &il = group->getVariableIndexList();
-    if (group->isContiguousWithinState())
-      memcpy(gstate, position_ + il[0], group->getVariableCount() * sizeof(double));
-    else
-    {
-      for (std::size_t i = 0 ; i < il.size() ; ++i)
-        gstate[i] = position_[il[i]];
-    }
-  }
+  void copyJointGroupPositions(const JointModelGroup *group, double *gstate) const;
   
   /** @} */
+
+  /** \defgroup setGroupPosition_Fn Getting and setting whole states
+   *  @{
+   */
   
   void setVariableValues(const sensor_msgs::JointState& msg)
   {
@@ -370,106 +354,33 @@ public:
     setVariableVelocities(msg.name, msg.velocity);
   }
   
-  double* getStatePositions()
+  void setToDefaultValues()
   {
-    return position_;
+    robot_model_->getVariableDefaultValues(position_);
+    dirty_fk_ = robot_model_->getRootJoint();
   }
   
-  const double* getStatePositions() const
-  {
-    return position_;
-  }
-  
-  double* getStateVelocity()
-  {
-    return velocity_;
-  }
-  
-  const double* getStateVelocity() const
-  {
-    return velocity_;
-  }
-  
-  double* getStateAcceleration()
-  {
-    return acceleration_;
-  }
-  
-  const double* getStateAcceleration() const
-  {
-    return acceleration_;
-  }
+  /** @} */
   
   /** \defgroup RobotStateGetTransforms Updating and getting transforms
    *  @{
    */
   
-  void updateCollisionBodyTransforms()
-  {
-    if (dirty_fk_ != NULL)
-    {
-      updateJointTransforms();
-      updateLinkTransforms();
-    }
-    else
-      if (dirty_link_transforms_ != NULL)
-        updateLinkTransforms();
-    
-    if (dirty_collision_body_transforms_ != NULL)
-    {
-      const std::vector<const LinkModel*> &links = dirty_collision_body_transforms_->getDescendantLinkModels();
-      dirty_collision_body_transforms_ = NULL;
-      for (std::size_t i = 0 ; i < links.size() ; ++i)
-	links[i]->updateCollisionBodyTransforms(&global_collision_body_transforms_->at(links[i]->getCollisionBodyIndex()));
-    }
-  }
+  /** \brief Update the transforms for the collision bodies. This call is needed before calling collision checking.
+      If updating link transforms or joint transorms is needed, the corresponding updates are also triggered. */
+  void updateCollisionBodyTransforms();
   
-  void updateLinkTransforms()
-  {
-    if (dirty_fk_ != NULL)
-      updateJointTransforms(); // resets dirty_fk_, makes sure memory is allocated for transforms
-    if (dirty_link_transforms_ != NULL)
-    {
-      const std::vector<const LinkModel*> &links = dirty_link_transforms_->getDescendantLinkModels();
-      if (dirty_collision_body_transforms_)
-        dirty_collision_body_transforms_ = robot_model_->getCommonRoot(dirty_collision_body_transforms_, dirty_link_transforms_);
-      else
-        dirty_collision_body_transforms_ = dirty_link_transforms_;
-      dirty_link_transforms_ = NULL;
-      for (std::size_t i = 0 ; i < links.size() ; ++i)
-	links[i]->updateTransform(global_link_transforms_->at(links[i]->getIndex()));
-      
-      // update attached bodies tf
-    }
-  }
+  /** \brief Update the reference frame transforms for links. This call is needed before using the transforms of links for coordinate transforms. */
+  void updateLinkTransforms();
   
-  
+  /** \brief Update the transforms joints apply given the currently set joint values. */
+  void updateJointTransforms();
+
+  /** \brief Update all transforms. */
   void update()
   {
     // this actually triggers all needed updates
     updateCollisionBodyTransforms();
-  }
-  
-  
-  void updateJointTransforms()
-  {
-    if (dirty_fk_ != NULL)
-    {
-      const std::vector<const JointModel*> &joint_models = robot_model_->getUpdatedJointModels(dirty_fk_);
-      if (dirty_link_transforms_)
-        dirty_link_transforms_ = robot_model_->getCommonRoot(dirty_fk_, dirty_link_transforms_);
-      else
-        dirty_link_transforms_ = dirty_fk_;
-      dirty_fk_ = NULL;
-      if (!variable_joint_transforms_)
-	allocTransforms();
-      for (std::size_t i = 0 ; i < joint_models.size() ; ++i)
-      {
-	int index = joint_models[i]->getJointIndex();
-	int vindex = joint_models[i]->getFirstVariableIndex();
-	joint_models[i]->updateTransform(position_ + vindex, variable_joint_transforms_->at(index));
-      }
-    }
   }
   
   const Eigen::Affine3d& getGlobalLinkTransform(const std::string &link_name)
@@ -480,10 +391,10 @@ public:
   const Eigen::Affine3d& getGlobalLinkTransform(const LinkModel *link)
   {
     updateLinkTransforms();
-    return global_link_transforms_->at(link->getIndex());
+    return global_link_transforms_[link->getLinkIndex()];
   }
   
-  const Eigen::Affine3d& getCollisionBodyTransform(const std::string &link_name, std::size_t index)
+  const Eigen::Affine3d& getCollisionBodyTransforms(const std::string &link_name, std::size_t index)
   {
     return getCollisionBodyTransform(robot_model_->getLinkModel(link_name), index);
   }
@@ -491,7 +402,7 @@ public:
   const Eigen::Affine3d& getCollisionBodyTransform(const LinkModel *link, std::size_t index)
   {
     updateCollisionBodyTransforms();
-    return global_link_transforms_->at(link->getCollisionBodyIndex() + index);
+    return global_collision_body_transforms_[link->getFirstCollisionBodyTransformIndex() + index];
   }
   
   const Eigen::Affine3d& getJointTransform(const std::string &joint_name)
@@ -502,7 +413,7 @@ public:
   const Eigen::Affine3d& getJointTransform(const JointModel *joint)
   {
     updateJointTransforms();
-    return variable_joint_transforms_->at(joint->getIndex());
+    return variable_joint_transforms_[joint->getJointIndex()];
   }
   
   const Eigen::Affine3d& getGlobalLinkTransform(const std::string &link_name) const
@@ -512,7 +423,7 @@ public:
   
   const Eigen::Affine3d& getGlobalLinkTransform(const LinkModel *link) const
   {
-    return global_link_transforms_->at(link->getIndex());
+    return global_link_transforms_[link->getLinkIndex()];
   }
   
   const Eigen::Affine3d& getCollisionBodyTransform(const std::string &link_name, std::size_t index) const
@@ -522,7 +433,7 @@ public:
   
   const Eigen::Affine3d& getCollisionBodyTransform(const LinkModel *link, std::size_t index) const
   {
-    return global_link_transforms_->at(link->getCollisionBodyIndex() + index);
+    return global_collision_body_transforms_[link->getFirstCollisionBodyTransformIndex() + index];
   }
   
   const Eigen::Affine3d& getJointTransform(const std::string &joint_name) const
@@ -532,7 +443,7 @@ public:
   
   const Eigen::Affine3d& getJointTransform(const JointModel *joint) const
   {
-    return variable_joint_transforms_->at(joint->getIndex());
+    return variable_joint_transforms_[joint->getJointIndex()];
   }
   
   /** \defgroup distanceFunctions Computing distances
@@ -541,7 +452,7 @@ public:
   
   double distance(const RobotState &other) const
   {
-    return distance(other.getStatePositions());
+    return distance(other.getVariablePositions());
   }
   
   double distance(const RobotState &other, const JointModel *joint) const
@@ -557,12 +468,12 @@ public:
   
   void interpolate(const RobotState &to, double t, RobotState &state)
   {
-    interpolate(to.getJointPositions(), t, state.getJointPositions());
+    interpolate(to.getVariablePositions(), t, state.getVariablePositions());
   }
   
   void interpolate(const RobotState &to, double t, RobotState &state, const JointModel *joint)
   {
-    interpolate(to.getJointPositions(joint), t, state.getJointPositions(joint), joint);
+    interpolate(to.getJointPositions(joint), t, const_cast<double*>(state.getJointPositions(joint)), joint);
   }
   
   void interpolate(const RobotState &to, double t, RobotState &state, const JointModelGroup *joint_group);
@@ -595,47 +506,12 @@ public:
   /** @} */
   
 private:
+
+  void copyFrom(const RobotState &other);
   
-  void allocVelocity()
-  {
-    if (!velocity_)
-    {
-      called_new_for_ |= ALLOC_VELOCITY;
-      velocity_ = new double[robot_model->getVariableCount()];
-    }
-  }
-  
-  void allocAcceleration()
-  {
-    if (!acceleration_)
-    {
-      if (velocity_)
-      {
-        called_new_for_ |= ALLOC_ACCELERATION;
-	acceleration_ = new double[robot_model_->getVariableCount()];
-      }
-      else
-      {
-        called_new_for_ |= ALLOC_VELOCITY;
-        velocity_ = new double[robot_model_->getVariableCount() * 2];
-        acceleration_ = velocity_ + robot_model_->getVariableCount();
-      }
-    }
-  }
-  
-  void allocTransforms()
-  {
-    if (!variable_joint_transforms_)
-    {
-      transforms_.resize(robot_model_->getJointCount() + robot_model_->getLinkCount() + robot_model_->getLinkGeometryCount());
-      if (transforms_.size() > 0)
-      {
-	variable_joint_transforms_ = &transforms_[0];      
-	global_link_transforms_ = variable_joint_transforms_ + robot_model_->getJointCount();
-	global_collision_body_transforms_ = global_link_transforms_ + robot_model_->getLinkCount();
-      }
-    }
-  }
+  void allocVelocity();
+  void allocAcceleration();
+  void allocTransforms();
   
   void dirtyFK(int index)
   {
@@ -651,60 +527,39 @@ private:
   {
     const JointModel *jm = robot_model_->getJointOfVariable(index);
     if (jm)
-    {
-      double v = position_[index];
-      const std::vector<const JointModel*> &mim = jm->getMimicRequests();
-      for (std::size_t i = 0 ; i < mim.size() ; ++i)
-        position_[mim[i]->getMimic  mim[i]->getMimicFactor() * v + mim[i]->getMimicOffset()
-      
-      updateMimic(jm->getMimicRequests(), index);
-    }
-    
+      updateMimicJoint(jm);
   }
   
   void updateMimicJoint(const JointModel *joint)
   {
-    int idx = joint->getFirstVariableIndex();
-    if (idx >= 0)
-      updateMimic(joint, idx);
+    const std::vector<const JointModel*> &mim = joint->getMimicRequests();
+    double v = position_[joint->getFirstVariableIndex()];
+    for (std::size_t i = 0 ; i < mim.size() ; ++i)
+      position_[mim[i]->getFirstVariableIndex()] =  mim[i]->getMimicFactor() * v + mim[i]->getMimicOffset();
   }
+
+  void getMissingKeys(const std::map<std::string, double> &variable_map, std::vector<std::string> &missing_variables) const;
   
-  void updateMimic(const JointModel *joint, int index)
-  {
-    const std::vector<const JointModel*> &mim = jm->getMimicRequests();
-    double v = position_ + v
-    double v = position_[index];
-    //      for (std::size_t i = 0 ; i < mim.size() ; ++i)
-    //        position_[mim[i]->getMimic  mim[i]->getMimicFactor() * v + mim[i]->getMimicOffset()
-    
-    
-  }
+  RobotModelConstPtr        robot_model_;
+  int                       called_new_for_;
   
+  double                   *position_;
+  double                   *velocity_;
+  double                   *acceleration_;
   
-  RobotModelConstPtr robot_model_;
-  AllocComponents called_new_for_;
-  
-  double *position_;
-  double *velocity_;
-  double *acceleration_;
-  
-  const JointModel *dirty_fk_;
-  const JointModel *dirty_collision_body_transforms_;
-  const JointModel *dirty_link_transforms_;
+  const JointModel         *dirty_fk_;
+  const JointModel         *dirty_link_transforms_;
+  const JointModel         *dirty_collision_body_transforms_;
   
   EigenSTL::vector_Affine3d transforms_;
-  Eigen::Affine3d *variable_joint_transforms_; // this points to an element in transforms_, so it is aligned 
-  Eigen::Affine3d *global_link_transforms_;  // this points to an element in transforms_, so it is aligned 
-  Eigen::Affine3d *global_collision_body_transforms_;  // this points to an element in transforms_, so it is aligned 
+  Eigen::Affine3d          *variable_joint_transforms_; // this points to an element in transforms_, so it is aligned 
+  Eigen::Affine3d          *global_link_transforms_;  // this points to an element in transforms_, so it is aligned 
+  Eigen::Affine3d          *global_collision_body_transforms_;  // this points to an element in transforms_, so it is aligned 
   
   //  std::vector<AttachedBody*> attached_bodies_;
 };
 
-// for every joint index modified, we need a map of where to start FK?
-// => for every pair of joint indices (matrix) common ancestor index is where we start FK.
 
-// jointA->isAncestor(jointB) then jointA is sufficient root.
-// => maintain list of dirty roots.
 }
 }
 

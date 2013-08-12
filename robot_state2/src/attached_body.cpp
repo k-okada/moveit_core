@@ -1,7 +1,7 @@
 /*********************************************************************
 * Software License Agreement (BSD License)
 *
-*  Copyright (c) 2008, Willow Garage, Inc.
+*  Copyright (c) 2013, Willow Garage, Inc.
 *  All rights reserved.
 *
 *  Redistribution and use in source and binary forms, with or without
@@ -36,29 +36,29 @@
 
 #include <moveit/robot_state/attached_body.h>
 
-robot_state::AttachedBody::AttachedBody(const robot_model::LinkModel *parent_link_model,
-                                        const std::string &id,
-                                        const std::vector<shapes::ShapeConstPtr> &shapes,
-                                        const EigenSTL::vector_Affine3d &attach_trans,
-                                        const std::set<std::string> &touch_links,
-                                        const sensor_msgs::JointState &detach_posture) :
-  parent_link_model_(parent_link_model),
-  id_(id),
-  shapes_(shapes),
-  attach_trans_(attach_trans),
-  touch_links_(touch_links),
-  detach_posture_(detach_posture)
+moveit::core::AttachedBody::AttachedBody(const LinkModel *parent_link_model,
+                                         const std::string &id,
+                                         const std::vector<shapes::ShapeConstPtr> &shapes,
+                                         const EigenSTL::vector_Affine3d &attach_trans,
+                                         const std::set<std::string> &touch_links,
+                                         const sensor_msgs::JointState &detach_posture)
+  : parent_link_model_(parent_link_model)
+  , id_(id)
+  , shapes_(shapes)
+  , attach_trans_(attach_trans)
+  , touch_links_(touch_links)
+  , detach_posture_(detach_posture)
 {
   global_collision_body_transforms_.resize(attach_trans.size());
   for(std::size_t i = 0 ; i < global_collision_body_transforms_.size() ; ++i)
     global_collision_body_transforms_[i].setIdentity();
 }
 
-robot_state::AttachedBody::~AttachedBody()
+moveit::core::AttachedBody::~AttachedBody()
 {
 }
 
-void robot_state::AttachedBody::setScale(double scale)
+void moveit::core::AttachedBody::setScale(double scale)
 {
   for (std::size_t i = 0 ; i < shapes_.size() ; ++i)
   {
@@ -75,7 +75,7 @@ void robot_state::AttachedBody::setScale(double scale)
   }
 }
 
-void robot_state::AttachedBody::setPadding(double padding)
+void moveit::core::AttachedBody::setPadding(double padding)
 {
   for (std::size_t i = 0 ; i < shapes_.size() ; ++i)
   {
@@ -90,10 +90,4 @@ void robot_state::AttachedBody::setPadding(double padding)
       shapes_[i].reset(copy);
     }
   }
-}
-
-void robot_state::AttachedBody::computeTransform(const Eigen::Affine3d &parent_link_global_transform)
-{
-  for(std::size_t i = 0; i < global_collision_body_transforms_.size() ; ++i)
-    global_collision_body_transforms_[i] = parent_link_global_transform * attach_trans_[i];
 }

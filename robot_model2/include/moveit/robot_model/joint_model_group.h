@@ -144,12 +144,11 @@ public:
     return continuous_joint_model_vector_;
   }
 
-  /** \brief Get the names of the variables that make up the joints included in this group. Only active joints (not
-      fixed, not mimic) are included. Effectively, these are the names of the DOF for this group. The number of
-      returned elements is always equal to getVariableCount() */
-  const std::vector<std::string>& getActiveVariableNames() const
+  /** \brief Get the names of the variables that make up the joints included in this group. The number of
+      returned elements is always equal to getVariableCount(). This includes mimic joints. */
+  const std::vector<std::string>& getVariableNames() const
   {
-    return active_variable_names_;
+    return variable_names_;
   }
 
   /** \brief Unlike a complete kinematic model, a group may
@@ -236,12 +235,6 @@ public:
     return updated_link_model_name_set_.find(name) != updated_link_model_name_set_.end();
   }
 
-  /** \brief Is the joint in the list of active joints in this group (that  have controllable DOF).
-      This may not be the complete set of joints (see getFixedJointModels() and getMimicJointModels() ) */
-  bool isActiveDOF(const std::string &name) const
-  {
-    return active_variable_names_set_.find(name) != active_variable_names_set_.end();
-  }
 
   /** \brief A joint group consists of an array of joints. Each joint has a specific ordering of its variables.
       Given the ordering of joints the group maintains, an ordering of all the variables of the group can be then constructed.
@@ -492,10 +485,10 @@ protected:
   std::vector<const JointModel*>                             continuous_joint_model_vector_;
 
   /** \brief The names of the DOF that make up this group (this is just a sequence of joint variable names; not necessarily joint names!) */
-  std::vector<std::string>                                   active_variable_names_;
+  std::vector<std::string>                                   variable_names_;
 
   /** \brief The names of the DOF that make up this group (this is just a sequence of joint variable names; not necessarily joint names!) */
-  std::set<std::string>                                      active_variable_names_set_;
+  std::set<std::string>                                      variable_names_set_;
 
   /** \brief A map from joint names to their instances. This includes all joints in the group. */
   boost::container::flat_map<std::string, const JointModel*> joint_model_map_;

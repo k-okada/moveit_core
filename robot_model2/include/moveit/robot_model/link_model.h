@@ -42,7 +42,6 @@
 #include <utility>
 #include <Eigen/Geometry>
 #include <geometric_shapes/shapes.h>
-#include <geometric_shapes/shape_messages.h>
 #include <boost/container/flat_map.hpp>
 #include <eigen_stl_containers/eigen_stl_vector_container.h>
 
@@ -78,14 +77,34 @@ public:
   }
 
   /** \brief The index of this joint when traversing the kinematic tree in depth first fashion */
-  int getTreeIndex() const
+  int getLinkIndex() const
   {
-    return tree_index_;
+    return link_index_;
   }
 
-  void setTreeIndex(int index)
+  void setLinkIndex(int index)
   {
-    tree_index_ = index;
+    link_index_ = index;
+  }
+  
+  int getFirstCollisionBodyTransformIndex() const
+  {
+    return first_collision_body_transform_index_;
+  }
+
+  void setFirstCollisionBodyTransformIndex(int index) 
+  {
+    first_collision_body_transform_index_ = index;
+  }
+
+  int getLinkTransformIndex() const
+  {
+    return link_transform_index_;
+  }
+
+  void setLinkTransformIndex(int index)
+  {
+    link_transform_index_ = index;
   }
   
   /** \brief Get the joint model whose child this link is. There will always be a parent joint */
@@ -137,12 +156,6 @@ public:
 
   void setGeometry(const std::vector<shapes::ShapeConstPtr> &shapes, const EigenSTL::vector_Affine3d &origins);
   
-  /** \brief Get shape associated to the collision geometry for this link */
-  //  const shapes::ShapeMsg& getShapeMsg() const
-  //  {
-  //    return shape_msg_;
-  //  }
-
   /** \brief Get the extents of the link's geometry (dimensions of axis-aligned bounding box around all shapes that make up the
       link, when the link is positioned at origin -- only collision origin transforms are considered) */
   const Eigen::Vector3d& getShapeExtentsAtOrigin() const
@@ -199,8 +212,6 @@ private:
   /** \brief The collision geometry of the link */
   std::vector<shapes::ShapeConstPtr> shapes_;
 
-  /** \brief The collision geometry of the link as a message */
-  //  shapes::ShapeMsg          shape_msg_;
 
   /** \brief The extents if shape (dimensions of axis aligned bounding box when shape is at origin */
   Eigen::Vector3d           shape_extents_;
@@ -211,8 +222,13 @@ private:
   /** \brief Scale factor associated with the visual geometry mesh of this link. */
   Eigen::Vector3d           visual_mesh_scale_;
 
-  /** \brief The index assigned to this link when traversing the kinematic tree in depth first fashion */
-  int                       tree_index_;
+  /** \brief Index of the transform for the first shape that makes up the geometry of this link in the full robot state */
+  int                       first_collision_body_transform_index_;
+
+  /** \brief Index of the transform for this link in the full robot frame */
+  int                       link_transform_index_;
+
+  int                       link_index_;
 
 };
 }

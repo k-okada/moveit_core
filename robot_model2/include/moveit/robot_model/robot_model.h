@@ -124,11 +124,11 @@ public:
   const std::string& getRootJointName() const
   {
     return getRootJoint()->getName();
-  }  
+  }
   
   /** \brief Check if a joint exists. Return true if it does. */
   bool hasJointModel(const std::string &name) const;
-    
+
   /** \brief Get a joint by its name. Throw an exception when the joint is missing. */
   const JointModel* getJointModel(const std::string &joint) const;
 
@@ -191,6 +191,11 @@ public:
   {
     return joints_of_variable_[getVariableIndex(variable)];
   }
+
+  std::size_t getJointModelCount() const
+  {
+    return joint_model_vector_.size();
+  }
   
   /** @} */
 
@@ -246,6 +251,16 @@ public:
     return link_model_names_with_collision_geometry_vector_;
   }
 
+  std::size_t getLinkModelCount() const
+  {
+    return link_model_vector_.size();
+  }
+  
+  std::size_t getLinkGeometryCount() const
+  {
+    return link_geometry_count_;
+  }
+  
   /** @} */
 
 
@@ -329,12 +344,11 @@ public:
     return variable_count_;
   }
 
-  /** \brief Get the names of the variables that make up the joints that form this state. Only active joints (not
-      fixed, not mimic) are included. Effectively, these are the names of the DOF for this group. The number of
-      returned elements is always equal to getVariableCount() */
+  /** \brief Get the names of the variables that make up the joints that form this state. Fixed joints have no DOF, so they are not here,
+      but the variables for mimic joints are included. The number of returned elements is always equal to getVariableCount() */
   const std::vector<std::string>& getVariableNames() const
   {
-    return active_variable_names_;
+    return variable_names_;
   }
 
   /** \brief Get bounds for all the variables in this model. Bounds are returned as a std::pair<lower,upper> */
@@ -372,37 +386,6 @@ public:
   void setKinematicsAllocators(const std::map<std::string, SolverAllocatorFn> &allocators);
 
 protected:
-
-  /** \brief Get the map between joint group names and the SRDF group object */
-  //  const std::map<std::string, srdf::Model::Group>& getJointModelGroupConfigMap() const
-  //  {
-  //    return joint_model_group_config_map_;
-  //  }
-
-
-  /** \brief Get the set of link models that follow a parent link in the kinematic chain */
-  //  void getChildLinkModels(const LinkModel* parent, std::vector<const LinkModel*> &links) const;
-
-  /** \brief Get the set of link models that follow a parent joint in the kinematic chain */
-  //  void getChildLinkModels(const JointModel* parent, std::vector<const LinkModel*> &links) const;
-
-  /** \brief Get the set of joint models that follow a parent link in the kinematic chain */
-  //  void getChildJointModels(const LinkModel* parent, std::vector<const JointModel*> &links) const;
-
-  /** \brief Get the set of joint models that follow a parent joint in the kinematic chain */
-  //  void getChildJointModels(const JointModel* parent, std::vector<const JointModel*> &links) const;
-
-  /** \brief Get the set of link names that follow a parent link in the kinematic chain */
-  //  std::vector<std::string> getChildLinkModelNames(const LinkModel* parent) const;
-
-  /** \brief Get the set of joint names that follow a parent link in the kinematic chain */
-  //  std::vector<std::string> getChildJointModelNames(const LinkModel* parent) const;
-
-  /** \brief Get the set of joint names that follow a parent joint in the kinematic chain */
-  //  std::vector<std::string> getChildJointModelNames(const JointModel* parent) const;
-
-  /** \brief Get the set of link names that follow a parent link in the kinematic chain */
-  //  std::vector<std::string> getChildLinkModelNames(const JointModel* parent) const;
 
   void computeFixedTransforms(const LinkModel *link, const Eigen::Affine3d &transform, 
                               LinkModel::AssociatedFixedTransformMap &associated_transforms);
@@ -446,7 +429,9 @@ protected:
   /** \brief The vector of link names that corresponds to link_models_with_collision_geometry_vector_ */
   std::vector<std::string>                      link_model_names_with_collision_geometry_vector_;
 
-
+  /** \brief Total number of geometric shapes in this model */
+  std::size_t                                   link_geometry_count_;
+  
   // JOINTS
 
   /** \brief The root joint */
@@ -488,10 +473,10 @@ protected:
   // INDEXING
 
   /** \brief The names of the DOF that make up this state (this is just a sequence of joint variable names; not necessarily joint names!) */
-  std::vector<std::string>                      active_variable_names_;
+  std::vector<std::string>                      variable_names_;
 
   /** \brief Get the number of variables necessary to describe this model */
-  unsigned int                                  variable_count_;
+  std::size_t                                   variable_count_;
 
   /** \brief The state includes all the joint variables that make up the joints the state consists of.
       This map gives the position in the state vector of the group for each of these variables.
