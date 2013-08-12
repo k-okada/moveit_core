@@ -32,7 +32,7 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 *********************************************************************/
 
-/** Author: Ioan Sucan */
+/* Author: Ioan Sucan */
 
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/test_resources/config.h>
@@ -56,7 +56,7 @@ protected:
       while (xml_file.good())
       {
         std::string line;
-        std::getline( xml_file, line);
+        std::getline(xml_file, line);
         xml_string += (line + "\n");
       }
       xml_file.close();

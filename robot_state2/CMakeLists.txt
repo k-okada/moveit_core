@@ -16,5 +16,5 @@ install(DIRECTORY include/ DESTINATION include)
 catkin_add_gtest(test_robot_state test/test_kinematic.cpp)
 target_link_libraries(test_robot_state ${catkin_LIBRARIES} ${MOVEIT_LIB_NAME})
 
-#catkin_add_gtest(test_robot_state_complex test/test_kinematic_complex.cpp)
-#target_link_libraries(test_robot_state_complex ${MOVEIT_LIB_NAME})
+catkin_add_gtest(test_robot_state_complex test/test_kinematic_complex.cpp)
+target_link_libraries(test_robot_state_complex ${catkin_LIBRARIES} ${MOVEIT_LIB_NAME})

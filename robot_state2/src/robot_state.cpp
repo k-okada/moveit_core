@@ -51,6 +51,7 @@ moveit::core::RobotState::RobotState(const RobotModelConstPtr &robot_model, Allo
   , dirty_fk_(NULL)
   , dirty_link_transforms_(NULL)
   , dirty_collision_body_transforms_(NULL)
+  , rng_(NULL)
 {
   if (alloc_components & ALLOC_TRANSFORMS)
     allocTransforms();
@@ -63,6 +64,7 @@ moveit::core::RobotState::RobotState(const RobotState &other)
   , variable_joint_transforms_(NULL)
   , global_link_transforms_(NULL)
   , global_collision_body_transforms_(NULL)
+  , rng_(NULL)
 {
   copyFrom(other);
 }
@@ -74,6 +76,15 @@ moveit::core::RobotState::~RobotState()
     delete[] velocity_;
   if (called_new_for_ & ALLOC_ACCELERATION)
     delete[] acceleration_;
+  if (rng_)
+    delete rng_;
+}
+
+moveit::core::RobotState& moveit::core::RobotState::operator=(const RobotState &other)
+{
+  if (this != &other)
+    copyFrom(other);
+  return *this;
 }
 
 void moveit::core::RobotState::allocVelocity()
@@ -192,7 +203,10 @@ void moveit::core::RobotState::copyFrom(const RobotState &other)
   }
   
   // copy attached bodies
-  
+  clearAttachedBodies();
+  for (std::map<std::string, AttachedBody*>::const_iterator it = other.attached_body_map_.begin() ; it != other.attached_body_map_.end() ; ++it)
+    attachBody(it->second->getName(), it->second->getShapes(), it->second->getFixedTransforms(),
+               it->second->getTouchLinks(), it->second->getAttachedLinkName(), it->second->getDetachPosture());
 }
 
 void moveit::core::RobotState::setVariablePositions(const std::map<std::string, double> &variable_map)
@@ -397,16 +411,124 @@ void moveit::core::RobotState::enforceBounds()
 {
   const std::vector<const JointModel*> &jm = robot_model_->getJointModels();
   for (std::size_t i = 0 ; i < jm.size() ; ++i)
-  {
-    std::cout << jm[i]->getName() << std::endl;
-    
     enforceBounds(jm[i]);
-  }
-  
 }
 
 void moveit::core::RobotState::enforceBounds(const JointModelGroup *joint_group)
 {
+  const std::vector<const JointModel*> &jm = joint_group->getJointModels();
+  for (std::size_t i = 0 ; i < jm.size() ; ++i)
+    enforceBounds(jm[i]);
+}
+
+bool moveit::core::RobotState::hasAttachedBody(const std::string &id) const
+{
+  return attached_body_map_.find(id) != attached_body_map_.end();
+}
+
+const moveit::core::AttachedBody* moveit::core::RobotState::getAttachedBody(const std::string &id) const
+{
+  std::map<std::string, AttachedBody*>::const_iterator it = attached_body_map_.find(id);
+  if (it == attached_body_map_.end())
+  {
+    logError("Attached body '%s' not found", id.c_str());
+    return NULL;
+  }
+  else
+    return it->second;
+}
+
+void moveit::core::RobotState::attachBody(AttachedBody *attached_body)
+{
+  attached_body_map_[attached_body->getName()] = attached_body;
+  attached_body->computeTransform(getGlobalLinkTransform(attached_body->getAttachedLink()));
+  if (attached_body_update_callback_)
+    attached_body_update_callback_(attached_body, true);
+}
+
+void moveit::core::RobotState::attachBody(const std::string &id,
+                                          const std::vector<shapes::ShapeConstPtr> &shapes,
+                                          const EigenSTL::vector_Affine3d &attach_trans,
+                                          const std::set<std::string> &touch_links,
+                                          const std::string &link,
+                                          const sensor_msgs::JointState &detach_posture)
+{
+  const LinkModel *l = robot_model_->getLinkModel(link);
+  AttachedBody *ab = new AttachedBody(l, id, shapes, attach_trans, touch_links, detach_posture);
+  attached_body_map_[id] = ab;
+  ab->computeTransform(getGlobalLinkTransform(l));
+  if (attached_body_update_callback_)
+    attached_body_update_callback_(ab, true);
+}
+
+void moveit::core::RobotState::getAttachedBodies(std::vector<const AttachedBody*> &attached_bodies) const
+{
+  attached_bodies.clear();
+  attached_bodies.reserve(attached_body_map_.size());
+  for (std::map<std::string, AttachedBody*>::const_iterator it = attached_body_map_.begin() ; it != attached_body_map_.end() ;  ++it)
+    attached_bodies.push_back(it->second);
+}
+
+void moveit::core::RobotState::clearAttachedBodies()
+{
+  for (std::map<std::string, AttachedBody*>::const_iterator it = attached_body_map_.begin() ; it != attached_body_map_.end() ;  ++it)
+  {
+    if (attached_body_update_callback_)
+      attached_body_update_callback_(it->second, false);
+    delete it->second;
+  }
+  attached_body_map_.clear();
+}
+
+void moveit::core::RobotState::clearAttachedBodies(const LinkModel *link)
+{
+  std::map<std::string, AttachedBody*>::iterator it = attached_body_map_.begin();
+  while (it != attached_body_map_.end())
+  {
+    if (it->second->getAttachedLink() != link)
+    {
+      ++it;
+      continue;
+    }
+    if (attached_body_update_callback_)
+      attached_body_update_callback_(it->second, false);
+    delete it->second;
+    std::map<std::string, AttachedBody*>::iterator del = it++;
+    attached_body_map_.erase(del);
+  }
+}
+
+void moveit::core::RobotState::clearAttachedBodies(const JointModelGroup *group)
+{
+  std::map<std::string, AttachedBody*>::iterator it = attached_body_map_.begin();
+  while (it != attached_body_map_.end())
+  {
+    if (!group->hasLinkModel(it->second->getAttachedLinkName()))
+    {
+      ++it;
+      continue;
+    }
+    if (attached_body_update_callback_)
+      attached_body_update_callback_(it->second, false);
+    delete it->second;
+    std::map<std::string, AttachedBody*>::iterator del = it++;
+    attached_body_map_.erase(del);
+  }
+}
+
+bool moveit::core::RobotState::clearAttachedBody(const std::string &id)
+{
+  std::map<std::string, AttachedBody*>::iterator it = attached_body_map_.find(id);
+  if (it != attached_body_map_.end())
+  {
+    if (attached_body_update_callback_)
+      attached_body_update_callback_(it->second, false);
+    delete it->second;
+    attached_body_map_.erase(it);
+    return true;
+  }
+  else
+    return false;
 }
 
 void moveit::core::RobotState::printStateInfo(std::ostream &out) const

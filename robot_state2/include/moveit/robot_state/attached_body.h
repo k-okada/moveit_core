@@ -39,6 +39,7 @@
 
 #include <moveit/robot_model/link_model.h>
 #include <eigen_stl_containers/eigen_stl_containers.h>
+#include <boost/function.hpp>
 #include <sensor_msgs/JointState.h>
 #include <set>
 
@@ -46,6 +47,9 @@ namespace moveit
 {
 namespace core
 {
+
+class AttachedBody;
+typedef boost::function<void(AttachedBody *body, bool attached)> AttachedBodyCallback;
 
 /** @brief Object defining bodies that can be attached to robot
  *  links. This is useful when handling objects picked up by

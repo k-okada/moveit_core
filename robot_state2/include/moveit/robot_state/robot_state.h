@@ -67,6 +67,8 @@ public:
   
   RobotState(const RobotState &other);
 
+  RobotState& operator=(const RobotState &other);
+  
   std::size_t getVariableCount() const
   {
     return robot_model_->getVariableCount();
@@ -510,14 +512,65 @@ public:
   /** \defgroup RobotStateAttachedBodies Managing attached bodies
    *  @{
    */
-  //  void getAttachedBodies(std::vector<const AttachedBody*> &attached_bodies) const;
-  //  void getAttachedBodies(const std::string &link, std::vector<const AttachedBody*> &attached_bodies) const;
   
-  /** @brief Get the attached body with name \e id */
-  //  const AttachedBody* getAttachedBody(const std::string &id) const;
   
-  /** \brief Check if an attached body named \e id exists in this group */
-  //  bool hasAttachedBody(const std::string &id) const;
+  /** \brief Attach a body to this state. Ownership of the memory for the attached body is assumed by the state. */
+  void attachBody(AttachedBody *attached_body);
+  
+  /**
+     @brief Attach a body to a link
+     @param id The string id associated with the attached body
+     @param shapes The shapes that make up the attached body
+     @param attach_trans The desired transform between this link and the attached body
+     @param touch_links The set of links that the attached body is allowed to touch
+     @param link_name The link to attach to
+  */
+  void attachBody(const std::string &id,
+                  const std::vector<shapes::ShapeConstPtr> &shapes,
+                  const EigenSTL::vector_Affine3d &attach_trans,
+                  const std::set<std::string> &touch_links,
+                  const std::string &link_name,
+                  const sensor_msgs::JointState &detach_posture = sensor_msgs::JointState());
+
+  /**
+     @brief Attach a body to a link
+     @param id The string id associated with the attached body
+     @param shapes The shapes that make up the attached body
+     @param attach_trans The desired transform between this link and the attached body
+     @param touch_links The set of links that the attached body is allowed to touch
+     @param link_name The link to attach to
+  */
+  void attachBody(const std::string &id,
+                  const std::vector<shapes::ShapeConstPtr> &shapes,
+                  const EigenSTL::vector_Affine3d &attach_trans,
+                  const std::vector<std::string> &touch_links,
+                  const std::string &link_name,
+                  const sensor_msgs::JointState &detach_posture = sensor_msgs::JointState())
+  {
+    std::set<std::string> touch_links_set(touch_links.begin(), touch_links.end());
+    attachBody(id, shapes, attach_trans, touch_links_set, link_name, detach_posture);
+  }
+
+  /** \brief Get all bodies attached to the model corresponding to this state */
+  void getAttachedBodies(std::vector<const AttachedBody*> &attached_bodies) const;
+
+  /** \brief Remove the attached body named \e id. Return false if the object was not found (and thus not removed). Return true on success. */
+  bool clearAttachedBody(const std::string &id);
+
+  /** \brief Clear the bodies attached to a specific link */
+  void clearAttachedBodies(const LinkModel *link);
+
+  /** \brief Clear the bodies attached to a specific group */
+  void clearAttachedBodies(const JointModelGroup *group);
+
+  /** \brief Clear all attached bodies. This calls delete on the AttachedBody instances, if needed. */
+  void clearAttachedBodies();
+
+  /** \brief Get the attached body named \e name. Return NULL if not found. */
+  const AttachedBody* getAttachedBody(const std::string &name) const;
+
+  /** \brief Check if an attached body named \e id exists in this state */
+  bool hasAttachedBody(const std::string &id) const;
   /** @} */
 
   void printStateInfo(std::ostream &out) const;
@@ -554,7 +607,15 @@ private:
     for (std::size_t i = 0 ; i < mim.size() ; ++i)
       position_[mim[i]->getFirstVariableIndex()] =  mim[i]->getMimicFactor() * v + mim[i]->getMimicOffset();
   }
-
+  
+  /** \brief Return the instance of a random number generator */
+  random_numbers::RandomNumberGenerator& getRandomNumberGenerator()
+  {
+    if (!rng_)
+      rng_ = new random_numbers::RandomNumberGenerator();
+    return *rng_;
+  }
+  
   void getMissingKeys(const std::map<std::string, double> &variable_map, std::vector<std::string> &missing_variables) const;
   void printTransform(const Eigen::Affine3d &transform, std::ostream &out) const;
   
@@ -574,7 +635,19 @@ private:
   Eigen::Affine3d          *global_link_transforms_;  // this points to an element in transforms_, so it is aligned 
   Eigen::Affine3d          *global_collision_body_transforms_;  // this points to an element in transforms_, so it is aligned 
   
-  //  std::vector<AttachedBody*> attached_bodies_;
+  /** \brief The attached bodies that are part of this state (from all links) */
+  std::map<std::string, AttachedBody*> attached_body_map_;
+
+  /** \brief This event is called when there is a change in the attached bodies for this state;
+      The event specifies the body that changed and whether it was just attached or about to be detached. */
+  AttachedBodyCallback                 attached_body_update_callback_;
+
+  
+  /** \brief For certain operations a state needs a random number generator. However, it may be slightly expensive
+      to allocate the random number generator if many state instances are generated. For this reason, the generator
+      is allocated on a need basis, by the getRandomNumberGenerator() function. Never use the rng_ member directly, but call
+      getRandomNumberGenerator() instead. */
+  random_numbers::RandomNumberGenerator *rng_;
 };
 
 
