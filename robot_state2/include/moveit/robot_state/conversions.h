@@ -42,8 +42,11 @@
 #include <moveit_msgs/RobotState.h>
 #include <moveit_msgs/RobotTrajectory.h>
 
-namespace robot_state
+namespace moveit
 {
+namespace core
+{
+
 /**
  * @brief Convert a joint state to a kinematic state
  * @param joint_state The input joint state to be converted
@@ -82,6 +85,7 @@ void robotStateToRobotStateMsg(const RobotState& state, moveit_msgs::RobotState 
  */
 void robotStateToJointStateMsg(const RobotState& state, sensor_msgs::JointState &joint_state);
 
+}
 }
 
 #endif

@@ -167,7 +167,19 @@ public:
   {
     return active_joint_model_vector_;
   }
-  
+
+  /** \brief This is a list of all single-dof joints (including mimic joints) */
+  const std::vector<const JointModel*>& getSingleDOFJointModels() const
+  {
+    return single_dof_joints_;
+  }
+
+  /** \brief This is a list of all multi-dof joints */
+  const std::vector<const JointModel*>& getMultiDOFJointModels() const
+  {
+    return multi_dof_joints_;
+  }  
+
   /** \brief Get the array of continuous joints, in the order they appear
       in the robot state. */
   const std::vector<const JointModel*>& getContinuousJointModels() const
@@ -372,6 +384,8 @@ public:
     return joint_variables_index_map_;
   }
 
+  void getMissingVariableNames(const std::vector<std::string> &variables, std::vector<std::string> &missing_variables) const;
+  
   /** \brief Get the index of a variable in the robot state */
   int getVariableIndex(const std::string &variable) const;
   
@@ -463,7 +477,11 @@ protected:
 
   /** \brief The set of mimic joints this model contains */
   std::vector<const JointModel*>                mimic_joints_;
-  
+
+  std::vector<const JointModel*>                single_dof_joints_;
+ 
+  std::vector<const JointModel*>                multi_dof_joints_;
+
   /** \brief For every two joints, the index of the common root for thw joints is stored.
       
       for jointA, jointB

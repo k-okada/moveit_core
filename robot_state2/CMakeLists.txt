@@ -3,6 +3,7 @@ set(MOVEIT_LIB_NAME moveit_robot_state)
 add_library(${MOVEIT_LIB_NAME}
   src/robot_state.cpp
   src/attached_body.cpp
+  src/conversions.cpp
 )
 # This line is needed to ensure that messages are done being built before this is built
 add_dependencies(${MOVEIT_LIB_NAME} moveit_msgs_gencpp)

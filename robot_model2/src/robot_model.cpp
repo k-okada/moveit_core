@@ -284,7 +284,12 @@ void moveit::core::RobotModel::buildJointInfo()
       joint_variables_index_map_[joint_model_vector_[i]->getName()] = variable_count_;
       
       // compute variable count
-      variable_count_ += joint_model_vector_[i]->getVariableCount();
+      std::size_t vc = joint_model_vector_[i]->getVariableCount();
+      variable_count_ += vc;
+      if (vc == 1)
+        single_dof_joints_.push_back(joint_model_vector_[i]);
+      else
+        multi_dof_joints_.push_back(joint_model_vector_[i]);
     }
   }
   
@@ -1124,6 +1129,16 @@ void moveit::core::RobotModel::getVariableDefaultValues(std::map<std::string, do
   values.clear();
   for (std::size_t i = 0 ; i < variable_names_.size() ; ++i)
     values[variable_names_[i]] = tmp[i];
+}
+
+void moveit::core::RobotModel::getMissingVariableNames(const std::vector<std::string> &variables, std::vector<std::string> &missing_variables) const
+{
+  missing_variables.clear();
+  std::set<std::string> keys(variables.begin(), variables.end());
+  for (std::size_t i = 0 ; i < variable_names_.size() ; ++i)
+    if (keys.find(variable_names_[i]) == keys.end())
+      if (getJointOfVariable(variable_names_[i])->getMimic() == NULL)
+        missing_variables.push_back(variable_names_[i]);
 }
 
 int moveit::core::RobotModel::getVariableIndex(const std::string &variable) const

@@ -85,10 +85,25 @@ public:
     return robot_model_->getVariableNames();
   }
   
+  const LinkModel* getLinkModel(const std::string &link) const
+  {
+    return robot_model_->getLinkModel(link);
+  }
+
+  const JointModel* getJointModel(const std::string &joint) const
+  {
+    return robot_model_->getJointModel(joint);
+  }
+  
   /** \defgroup setVariablePosition_Fn Getting and setting variable position
    *  @{
    */
 
+  bool hasPositions() const
+  {
+    return position_;
+  }
+  
   double* getVariablePositions()
   {
     return position_;
@@ -130,7 +145,7 @@ public:
   {
     position_[index] = value;
     updateMimicPosition(index);
-    dirtyFK(index);
+    dirtyJointTransforms(index);
   }
   
   const double getVariablePosition(const std::string &variable) const
@@ -148,6 +163,11 @@ public:
   /** \defgroup setVariableVelocity_Fn Getting and setting variable velocity
    *  @{
    */
+
+  bool hasVelocities() const
+  {
+    return velocity_;
+  }
 
   double* getVariableVelocities()
   {
@@ -204,6 +224,11 @@ public:
   /** \defgroup setVariableAcceleration_Fn Getting and setting variable acceleration
    *  @{
    */
+
+  bool hasAccelerations() const
+  {
+    return acceleration_;
+  }
 
   double* getVariableAccelerations()
   {
@@ -279,7 +304,7 @@ public:
   {  
     memcpy(position_ + joint->getFirstVariableIndex(), position, joint->getVariableCount() * sizeof(double));
     updateMimicJoint(joint);
-    dirtyFK(joint);
+    dirtyJointTransforms(joint);
   }
   
   void setJointPositions(const std::string &joint_name, const Eigen::Affine3d& transform)
@@ -291,7 +316,7 @@ public:
   {
     joint->computeVariableValues(transform, position_ + joint->getFirstVariableIndex());
     updateMimicJoint(joint);
-    dirtyFK(joint);
+    dirtyJointTransforms(joint);
   }
   
   const double* getJointPositions(const std::string &joint_name) const
@@ -364,8 +389,10 @@ public:
   
   void setVariableValues(const sensor_msgs::JointState& msg)
   {
-    setVariablePositions(msg.name, msg.position);
-    setVariableVelocities(msg.name, msg.velocity);
+    if (!msg.position.empty())
+      setVariablePositions(msg.name, msg.position);
+    if (!msg.velocity.empty())
+      setVariableVelocities(msg.name, msg.velocity);
   }
   
   void setToDefaultValues()
@@ -379,6 +406,11 @@ public:
   /** \defgroup RobotStateGetTransforms Updating and getting transforms
    *  @{
    */
+
+  bool hasTransforms() const
+  {
+    return !transforms_.empty();
+  }
   
   /** \brief Update the transforms for the collision bodies. This call is needed before calling collision checking.
       If updating link transforms or joint transorms is needed, the corresponding updates are also triggered. */
@@ -472,6 +504,23 @@ public:
     return variable_joint_transforms_[joint->getJointIndex()];
   }
   
+  bool dirtyJointTransforms() const
+  {
+    return transforms_.empty() || dirty_joint_transforms_;
+  }
+  
+  bool dirtyLinkTransforms() const
+  {
+    return dirtyJointTransforms() || dirty_link_transforms_;
+  }
+  
+  bool dirtyCollisionBodyTransforms() const
+  {
+    return dirtyLinkTransforms() || dirty_collision_body_transforms_;
+  }
+  
+  /** @} */
+  
   /** \defgroup distanceFunctions Computing distances
    *  @{
    */
@@ -501,7 +550,7 @@ public:
   void interpolate(const RobotState &to, double t, RobotState &state) const
   {
     interpolate(to.getVariablePositions(), t, state.getVariablePositions());
-    state.dirtyFK(robot_model_->getRootJoint());
+    state.dirtyJointTransforms(robot_model_->getRootJoint());
   }
 
   /** \brief Interpolate from this state towards state \e to, at time \e t in [0,1].  The result is stored in \e state,
@@ -515,7 +564,7 @@ public:
   {
     interpolate(to.getJointPositions(joint), t, const_cast<double*>(state.getJointPositions(joint)), joint);
     state.updateMimicJoint(joint);
-    state.dirtyFK(joint);
+    state.dirtyJointTransforms(joint);
   }
   /** \brief Interpolate the variable values for a single joint. No mimic joints are updated since we only have access to
       the memory for one individual joint. */
@@ -656,12 +705,12 @@ private:
   void allocAcceleration();
   void allocTransforms();
   
-  void dirtyFK(int index)
+  void dirtyJointTransforms(int index)
   {
     dirty_joint_transforms_ = dirty_joint_transforms_ == NULL ? robot_model_->getJointOfVariable(index) : robot_model_->getCommonRoot(dirty_joint_transforms_, robot_model_->getJointOfVariable(index));
   }
   
-  void dirtyFK(const JointModel *joint)
+  void dirtyJointTransforms(const JointModel *joint)
   {
     dirty_joint_transforms_ = dirty_joint_transforms_ == NULL ? joint : robot_model_->getCommonRoot(dirty_joint_transforms_, joint);
   }

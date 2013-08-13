@@ -44,7 +44,9 @@
 #include <boost/noncopyable.hpp>
 #include <moveit/macros/class_forward.h>
 
-namespace robot_state
+namespace moveit
+{
+namespace core
 {
 
 MOVEIT_CLASS_FORWARD(Transforms);
@@ -197,6 +199,7 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
+}
 }
 
 #endif

@@ -217,7 +217,7 @@ void moveit::core::RobotState::setVariablePositions(const std::map<std::string, 
     int index = robot_model_->getVariableIndex(it->first);
     position_[index] = it->second;
     updateMimicPosition(index);
-    dirtyFK(index);
+    dirtyJointTransforms(index);
   }
 }
 
@@ -244,7 +244,7 @@ void moveit::core::RobotState::setVariablePositions(const std::vector<std::strin
     int index = robot_model_->getVariableIndex(variable_names[i]);
     position_[index] = variable_position[i];  
     updateMimicPosition(index);
-    dirtyFK(index);
+    dirtyJointTransforms(index);
   }
 }
 
@@ -303,7 +303,7 @@ void moveit::core::RobotState::setJointGroupPositions(const JointModelGroup *gro
   const std::vector<const JointModel*> &mimic = group->getMimicJointModels();
   for (std::size_t i = 0 ; i < mimic.size() ; ++i)
     updateMimicJoint(mimic[i]);
-  dirtyFK(group->getCommonRoot());
+  dirtyJointTransforms(group->getCommonRoot());
 }
 
 void moveit::core::RobotState::copyJointGroupPositions(const JointModelGroup *group, double *gstate) const
@@ -561,7 +561,7 @@ void moveit::core::RobotState::interpolate(const RobotState &to, double t, Robot
   const std::vector<const JointModel*> &mimic = joint_group->getMimicJointModels();
   for (std::size_t i = 0 ; i < mimic.size() ; ++i)
     state.updateMimicJoint(mimic[i]);
-  state.dirtyFK(joint_group->getCommonRoot());
+  state.dirtyJointTransforms(joint_group->getCommonRoot());
 }
 
 void moveit::core::RobotState::setAttachedBodyUpdateCallback(const AttachedBodyCallback &callback)
