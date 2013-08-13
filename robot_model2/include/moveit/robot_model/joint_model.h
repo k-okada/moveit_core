@@ -460,7 +460,7 @@ protected:
 };
 
 /** \brief Operator overload for printing variable bounds to a stream */
-std::ostream& operator<<(std::ostream &os, const VariableBounds &b);
+std::ostream& operator<<(std::ostream &out, const VariableBounds &b);
 
 }
 }

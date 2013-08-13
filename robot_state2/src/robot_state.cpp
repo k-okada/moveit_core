@@ -855,6 +855,8 @@ void moveit::core::RobotState::printStateInfo(std::ostream &out) const
   out << "  * Dirty FK: " << (dirty_joint_transforms_ ? dirty_joint_transforms_->getName() : "NULL") << std::endl;
   out << "  * Dirty Link Transforms: " << (dirty_link_transforms_ ? dirty_link_transforms_->getName() : "NULL") << std::endl;
   out << "  * Dirty Collision Body Transforms: " << (dirty_collision_body_transforms_ ? dirty_collision_body_transforms_->getName() : "NULL") << std::endl;
+  
+  printTransforms(out);
 }
 
 void moveit::core::RobotState::printTransform(const Eigen::Affine3d &transform, std::ostream &out) const
@@ -943,3 +945,8 @@ void moveit::core::RobotState::getStateTreeJointString(std::ostream& ss, const J
 }
 
 
+std::ostream& moveit::core::operator<<(std::ostream &out, const RobotState &s)
+{
+  s.printStateInfo(out);
+  return out;  
+}

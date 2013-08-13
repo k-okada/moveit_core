@@ -131,10 +131,14 @@ namespace
 
 typedef std::map<const JointModel*, std::pair<std::set<const LinkModel*, OrderLinksByIndex>, std::set<const JointModel*, OrderJointsByIndex> > > DescMap;
 
-void computeDescendantsHelper(const JointModel *joint, std::vector<const JointModel*> &parents, DescMap &descendants)
+void computeDescendantsHelper(const JointModel *joint, std::vector<const JointModel*> &parents,
+                              std::set<const JointModel*> &seen, DescMap &descendants)
 {
   if (!joint)
     return;
+  if (seen.find(joint) != seen.end())
+    return;
+  seen.insert(joint);
   
   for (std::size_t i = 0 ; i < parents.size() ; ++i)
     descendants[parents[i]].second.insert(joint);
@@ -150,10 +154,10 @@ void computeDescendantsHelper(const JointModel *joint, std::vector<const JointMo
   parents.push_back(joint);
   const std::vector<const JointModel*> &ch = lm->getChildJointModels();
   for (std::size_t i = 0 ; i < ch.size() ; ++i)
-    computeDescendantsHelper(ch[i], parents, descendants);
+    computeDescendantsHelper(ch[i], parents, seen, descendants);
   const std::vector<const JointModel*> &mim = joint->getMimicRequests();
   for (std::size_t i = 0 ; i < mim.size() ; ++i)
-    computeDescendantsHelper(mim[i], parents, descendants);
+    computeDescendantsHelper(mim[i], parents, seen, descendants);
   parents.pop_back();
 }
 
@@ -224,8 +228,10 @@ void moveit::core::RobotModel::computeDescendants()
 {
   // compute the list of descendants for all joints
   std::vector<const JointModel*> parents;
+  std::set<const JointModel*> seen;
+  
   DescMap descendants;
-  computeDescendantsHelper(root_joint_, parents, descendants);
+  computeDescendantsHelper(root_joint_, parents, seen, descendants);
   for (DescMap::iterator it = descendants.begin() ; it != descendants.end() ; ++it)
   {
     JointModel *jm = const_cast<JointModel*>(it->first);

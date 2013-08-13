@@ -726,6 +726,8 @@ private:
   random_numbers::RandomNumberGenerator *rng_;
 };
 
+/** \brief Operator overload for printing variable bounds to a stream */
+std::ostream& operator<<(std::ostream &out, const RobotState &s);
 
 }
 }
